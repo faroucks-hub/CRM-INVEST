@@ -1,0 +1,200 @@
+'use client'
+
+import Link from 'next/link'
+import Image from 'next/image'
+import { usePathname } from 'next/navigation'
+import {
+  LayoutDashboard, Users, Building2, TrendingUp, FolderKanban,
+  Calculator, CreditCard, FileText, Receipt, Settings, Zap,
+  Sparkles, CheckSquare, HelpCircle, ClipboardList, Bell, BarChart3, ShoppingCart, Scale, Activity,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { UserRole } from '@/types'
+import {
+  Globe
+} from 'lucide-react'
+
+interface NavItem {
+  href:    string
+  label:   string
+  icon:    React.ElementType
+  roles:   UserRole[]
+  badge?:  string
+  section: string
+}
+
+const NAV_ITEMS: NavItem[] = [
+  // ── Principal
+  { href:'/dashboard',    label:'Dashboard',          icon:LayoutDashboard, roles:['admin','lead_team','commercial'], section:'principal' },
+  { href:'/calculateurs', label:'Calculateurs',        icon:Calculator,      roles:['admin','lead_team','commercial'], section:'principal' },
+  // ── Commercial
+  { href:'/clients',      label:'Clients & Prospects', icon:Users,           roles:['admin','lead_team','commercial'], section:'commercial' },
+  { href:'/opportunites', label:'Opportunités',         icon:TrendingUp,      roles:['admin','lead_team','commercial'], section:'commercial' },
+  { label: 'Website Leads', href: '/website-leads', icon: Globe, section: 'commercial',
+    roles: ['admin', 'lead_team', 'commercial'] },
+  { label: 'Corbeille Leads',
+  href: '/website-leads/trash',
+  icon: ClipboardList,
+  section: 'commercial',
+  roles: ['admin', 'lead_team']
+},
+  { href:'/quotations',   label:'Quotations',           icon:FileText,        roles:['admin','lead_team','commercial'], section:'commercial' },
+  // ── Opérations
+  { href:'/proformas',    label:'Proformas',            icon:Receipt,         roles:['admin','lead_team'],              section:'operations' },
+  { href:'/projets',      label:'Projets',              icon:FolderKanban,    roles:['admin','lead_team','commercial'], section:'operations' },
+  { href:'/paiements',    label:'Paiements',            icon:CreditCard,      roles:['admin','lead_team','commercial'], section:'operations' },
+  { href:'/documents',    label:'Documents',            icon:Zap,             roles:['admin','lead_team','commercial'], section:'operations' },
+  // ── Partenaires
+  { href:'/partenaires',   label:'Partenaires',         icon:Building2,       roles:['admin','lead_team'],              section:'partenaires' },
+  { href:'/achats',         label:'Achats & Commandes',  icon:ShoppingCart,    roles:['admin','lead_team'],              section:'partenaires' },
+  { href:'/controle-affaires', label:'Contrôle d’affaires', icon:Scale, roles:['admin','lead_team','commercial'], section:'partenaires' },
+  // ── Pilotage
+  { href:'/consolidation', label:'Consolidation affaires', icon:Activity, roles:['admin','lead_team','commercial'], section:'pilotage' },
+  { href:'/rapports',     label:'Rapports & Performance', icon:BarChart3,     roles:['admin','lead_team','commercial'], section:'pilotage' },
+  // ── Lydie AI
+  { href:'/notifications', label:'Notifications',         icon:Bell,            roles:['admin','lead_team','commercial'], section:'ia' },
+  { href:'/taches',       label:'Tâches',               icon:CheckSquare,     roles:['admin','lead_team','commercial'], section:'ia' },
+  { href:'/lydie',        label:'Lydie AI',             icon:Sparkles,        roles:['admin','lead_team','commercial'], section:'ia' },
+  { href:'/aide',         label:'Aide',                 icon:HelpCircle,      roles:['admin','lead_team','commercial'], section:'ia' },
+  // ── Admin
+  { href:'/parametres',        label:'Paramètres',              icon:Settings,       roles:['admin'], section:'admin' },
+  { href:'/parametres/utilisateurs', label:'Utilisateurs',           icon:Users,          roles:['admin'], section:'admin' },
+  { href:'/parametres/activite',     label:'Journal d\'activité',    icon:ClipboardList,  roles:['admin'], section:'admin' },
+]
+
+const SECTION_LABELS: Record<string, string> = {
+  principal:   '',
+  commercial:  'Commercial',
+  operations:  'Opérations',
+  partenaires: 'Partenaires',
+  pilotage:    'Pilotage',
+  ia:          'Intelligence',
+  admin:       'Administration',
+}
+
+interface SidebarProps { role: UserRole }
+
+export default function Sidebar({ role }: SidebarProps) {
+  const pathname = usePathname()
+
+  const visible = NAV_ITEMS.filter(item => !item.roles || item.roles.includes(role))
+
+  const sections = visible.reduce<Record<string, NavItem[]>>((acc, item) => {
+    if (!acc[item.section]) acc[item.section] = []
+    acc[item.section].push(item)
+    return acc
+  }, {})
+
+  return (
+    <aside className="w-56 flex-shrink-0 bg-navy-900 flex flex-col h-full">
+
+      {/* Logo */}
+<div className="px-4 py-5 border-b border-white/5">
+  <div className="flex items-center gap-3">
+    <Image
+      src="/images/logo-ime.png"
+      alt="IM ÉNERGIE"
+      width={160}
+      height={64}
+      className="h-10 w-auto object-contain"
+    />
+
+    <div>
+      <div className="text-white font-semibold text-sm tracking-wide">
+        IM ÉNERGIE CRM
+      </div>
+
+      <div className="text-white/40 text-[9px] uppercase tracking-widest">
+        Business Management
+      </div>
+    </div>
+  </div>
+</div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+        {Object.entries(sections).map(([section, items]) => (
+          <div key={section}>
+            {SECTION_LABELS[section] && (
+              <div className="px-2 mb-1.5 text-2xs font-semibold uppercase
+                             tracking-widest text-white/20">
+                {SECTION_LABELS[section]}
+              </div>
+            )}
+            <ul className="space-y-0.5">
+              {items.map((item) => {
+                const isActive = item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname.startsWith(item.href)
+                const Icon = item.icon
+                const isLydie = item.href === '/lydie'
+
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm',
+                        'transition-all duration-150 group relative',
+                        isActive
+                          ? isLydie
+                            ? 'bg-gold-400/15 text-gold-400'
+                            : 'bg-gold-400/10 text-gold-400'
+                          : 'text-white/45 hover:text-white/80 hover:bg-white/5'
+                      )}
+                    >
+                      {isActive && (
+                        <span className={cn(
+                          'absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full',
+                          isLydie ? 'bg-gold-400' : 'bg-gold-400'
+                        )} />
+                      )}
+                      <Icon className={cn(
+                        'w-4 h-4 flex-shrink-0',
+                        isActive
+                          ? 'text-gold-400'
+                          : isLydie
+                            ? 'text-gold-400/40 group-hover:text-gold-400/70'
+                            : 'text-white/35 group-hover:text-white/60'
+                      )} />
+                      <span className="flex-1 leading-none">{item.label}</span>
+                      {isLydie && !isActive && (
+                        <span className="text-2xs bg-gold-400/15 text-gold-400/80
+                                        px-1.5 py-0.5 rounded-full font-medium">
+                          IA
+                        </span>
+                      )}
+                      {item.badge && (
+                        <span className="text-2xs bg-gold-400/20 text-gold-400
+                                        px-1.5 py-0.5 rounded-full font-medium">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      {/* Lydie AI mini teaser (bas de sidebar, caché si déjà actif) */}
+      <div className="px-3 pb-4">
+        <div className="rounded-xl bg-gradient-to-br from-gold-400/10 to-gold-400/5
+                       border border-gold-400/15 p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+            <span className="text-xs font-semibold text-gold-400">Lydie AI</span>
+            <div className="ml-auto w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+          </div>
+          <p className="text-2xs text-white/25 leading-relaxed">
+            Votre assistante intelligente pour la gestion
+            des projets, documents et opérations IM ÉNERGIE.
+          </p>
+        </div>
+      </div>
+
+    </aside>
+  )
+}

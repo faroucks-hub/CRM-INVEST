@@ -1,0 +1,100 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { z } from 'zod'
+
+const clientSchema = z.object({
+  company_name:     z.string().min(1, 'Nom requis'),
+  trade_name:       z.string().optional(),
+  status:           z.string().default('prospect'),
+  country:          z.string().min(1, 'Pays requis'),
+  city:             z.string().optional(),
+  website:          z.string().optional(),
+  linkedin_url:     z.string().optional(),
+  sector:           z.string().optional(),
+  contact_name:     z.string().optional(),
+  contact_title:    z.string().optional(),
+  contact_email:    z.string().optional(),
+  contact_phone:    z.string().optional(),
+  contact_whatsapp: z.string().optional(),
+  contact2_name:    z.string().optional(),
+  contact2_email:   z.string().optional(),
+  contact2_phone:   z.string().optional(),
+  assigned_to:      z.string().optional(),
+  lead_source:      z.string().optional(),
+  currency_pref:    z.string().default('USD'),
+  technical_notes:  z.string().optional(),
+  notes:            z.string().optional(),
+})
+
+export type ClientFormData = z.infer<typeof clientSchema>
+
+export async function createClientAction(data: ClientFormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  const parsed = clientSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.errors[0].message }
+
+  const { data: refData, error: refError } = await supabase.rpc('generate_client_reference')
+
+if (refError) {
+  return { error: 'Erreur génération référence client: ' + refError.message }
+}
+
+  const { data: created, error } = await supabase
+    .from('clients')
+    .insert({
+      ...parsed.data,
+      reference:     refData ?? `CL-${Date.now()}`,
+      created_by:    user.id,
+      assigned_to:   parsed.data.assigned_to || null,
+      website:       parsed.data.website || null,
+      contact_email: parsed.data.contact_email || null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+  console.error('CREATE CLIENT ERROR:', error)
+
+  return {
+    error: `${error.message} | ${error.details ?? ''} | ${error.hint ?? ''}`
+  }
+}
+  revalidatePath('/clients')
+  return { data: created }
+}
+
+export async function updateClientAction(id: string, data: Partial<ClientFormData>) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  const { data: updated, error } = await supabase
+    .from('clients')
+    .update({ ...data, assigned_to: data.assigned_to || null })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath('/clients')
+  revalidatePath('/clients/' + id)
+  return { data: updated }
+}
+
+export async function archiveClientAction(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('clients')
+    .update({ is_archived: true })
+    .eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/clients')
+  return { success: true }
+}
+
+export const deleteClientAction = archiveClientAction

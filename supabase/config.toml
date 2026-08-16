@@ -1,0 +1,15 @@
+project_id = "ime-crm"
+
+[db]
+major_version = 15
+
+[db.seed]
+enabled = false
+sql_paths = ["./seeds/001_demo_data.sql"]
+
+[storage]
+enabled = true
+
+[storage.buckets.project-documents]
+public = false
+file_size_limit = "50MiB"
