@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { LogOut, User, ChevronDown } from 'lucide-react'
+import Link from 'next/link'
+import { LogOut, User, ChevronDown, CheckSquare, Calculator } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn, getInitials } from '@/lib/utils'
@@ -37,6 +38,25 @@ export default function TopBar({ user }: TopBarProps) {
 
       {/* Right */}
       <div className="flex items-center gap-2">
+
+        <Link
+          href="/taches"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-50 hover:text-navy-900"
+          aria-label="Ouvrir les tâches"
+          title="Tâches"
+        >
+          <CheckSquare className="h-5 w-5" />
+        </Link>
+
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event('open-global-calculator'))}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gold-400/10 hover:text-gold-700"
+          aria-label="Ouvrir le centre de calcul"
+          title="Centre de calcul (Ctrl/⌘ + Maj + C)"
+        >
+          <Calculator className="h-5 w-5" />
+        </button>
 
         {/* Notification Bell — real-time */}
         <NotificationBell userId={user.id} />

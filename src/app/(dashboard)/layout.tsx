@@ -8,6 +8,7 @@ import type { UserRole } from '@/types'
 import { canAccessRoute } from '@/lib/auth/permissions'
 import { headers } from 'next/headers'
 import CrmContextNavigation from "@/components/crm/CrmContextNavigation";
+import GlobalCalculator from '@/components/calculateurs/GlobalCalculator'
 
 export default async function DashboardLayout({
   children,
@@ -76,6 +77,7 @@ if (
           role: normalizedProfile.role,
         }}
       />
+      <GlobalCalculator />
     </div>
   )
 }

@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, Users, Building2, TrendingUp, FolderKanban,
-  Calculator, CreditCard, FileText, Receipt, Settings, Zap,
-  Sparkles, CheckSquare, HelpCircle, ClipboardList, Bell, BarChart3, ShoppingCart, Scale, Activity, ChevronDown,
+  CreditCard, FileText, Receipt, Settings, Zap,
+  Sparkles, HelpCircle, ClipboardList, BarChart3, ShoppingCart, Scale, Activity, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -28,17 +28,17 @@ const NAV_ITEMS: NavItem[] = [
   // ── Principal
   { href:'/dashboard',    label:'Dashboard',          icon:LayoutDashboard, roles:['admin','lead_team','commercial'], section:'accueil' },
   // ── Commercial
-  { href:'/clients',      label:'Clients & Prospects', icon:Users,           roles:['admin','lead_team','commercial'], section:'commercial' },
-  { href:'/opportunites', label:'Opportunités',         icon:TrendingUp,      roles:['admin','lead_team','commercial'], section:'commercial' },
   { label: 'Website Leads', href: '/website-leads', icon: Globe, section: 'commercial',
     roles: ['admin', 'lead_team', 'commercial'] },
-  { label: 'Corbeille Leads',
-  href: '/website-leads/trash',
-  icon: ClipboardList,
-  section: 'commercial',
-  roles: ['admin', 'lead_team']
-},
   { href:'/quotations',   label:'Quotations',           icon:FileText,        roles:['admin','lead_team','commercial'], section:'commercial' },
+  { href:'/clients',      label:'Clients & Prospects', icon:Users,           roles:['admin','lead_team','commercial'], section:'commercial' },
+  { href:'/opportunites', label:'Opportunités',         icon:TrendingUp,      roles:['admin','lead_team','commercial'], section:'commercial' },
+  { label: 'Corbeille Leads',
+    href: '/website-leads/trash',
+    icon: ClipboardList,
+    section: 'commercial',
+    roles: ['admin', 'lead_team']
+  },
   // ── Opérations
   { href:'/proformas',    label:'Proformas',            icon:Receipt,         roles:['admin','lead_team'],              section:'operations' },
   { href:'/projets',      label:'Projets',              icon:FolderKanban,    roles:['admin','lead_team','commercial'], section:'operations' },
@@ -52,9 +52,6 @@ const NAV_ITEMS: NavItem[] = [
   { href:'/consolidation', label:'Consolidation affaires', icon:Activity, roles:['admin','lead_team','commercial'], section:'pilotage' },
   { href:'/rapports',     label:'Rapports & Performance', icon:BarChart3,     roles:['admin','lead_team','commercial'], section:'pilotage' },
   // ── Lydie AI
-  { href:'/taches',       label:'Tâches',               icon:CheckSquare,     roles:['admin','lead_team','commercial'], section:'outils' },
-  { href:'/notifications', label:'Notifications',       icon:Bell,            roles:['admin','lead_team','commercial'], section:'outils' },
-  { href:'/calculateurs', label:'Calculateurs',         icon:Calculator,      roles:['admin','lead_team','commercial'], section:'outils' },
   { href:'/lydie',        label:'Lydie AI',             icon:Sparkles,        roles:['admin','lead_team','commercial'], section:'outils' },
   { href:'/aide',         label:"Guide d'utilisation", icon:HelpCircle,      roles:['admin','lead_team','commercial'], section:'assistance' },
   // ── Admin
@@ -124,7 +121,7 @@ export default function Sidebar({ role }: SidebarProps) {
             <button
               type="button"
               onClick={() => setClosedSections(current => ({ ...current, [section]: !current[section] }))}
-              className="w-full px-2 mb-1.5 flex items-center justify-between text-2xs font-semibold uppercase tracking-widest text-white/25 hover:text-white/50"
+              className="w-full px-2 mb-1.5 flex items-center justify-between text-left text-2xs font-semibold uppercase tracking-widest text-white/25 hover:text-white/50"
               aria-expanded={!closedSections[section] || activeSection === section}
             >
               <span>{SECTION_LABELS[section]}</span>
