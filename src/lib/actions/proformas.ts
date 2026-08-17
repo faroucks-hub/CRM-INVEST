@@ -1,8 +1,8 @@
 'use server'
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ProformaLine } from '@/types/sprint3'
+import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
 
 export interface ProformaPayload {
   client_id:string; quotation_id?:string; opportunity_id?:string; assigned_to?:string;
@@ -32,10 +32,11 @@ async function resolveCustomerTerms(supabase:any, profileId?:string) {
   return {commercial_role:data.commercial_role,terms_profile_id:data.id,terms_code:data.code,terms_version:data.version,terms_snapshot:data.terms_text}
 }
 
-export async function createProformaAction(data: ProformaPayload) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createProformaAction(data: ProformaPayload): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase, user } = ctx
 
   const { data: number, error: numErr } = await supabase
     .rpc('get_next_doc_number', { p_type: 'proforma', p_prefix: 'F' })
@@ -102,10 +103,11 @@ export async function createProformaAction(data: ProformaPayload) {
   return { data: prof }
 }
 
-export async function updateProformaAction(id: string, data: Partial<ProformaPayload> & { payment_status?: string }) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function updateProformaAction(id: string, data: Partial<ProformaPayload> & { payment_status?: string }): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase } = ctx
 
   const updateData: Record<string,unknown> = { ...data }
   let previousLines: Record<string, unknown>[] | null = null
@@ -162,10 +164,11 @@ export async function updateProformaAction(id: string, data: Partial<ProformaPay
   return { data: updated }
 }
 
-export async function createProformaFromQuotationAction(quotationId: string) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createProformaFromQuotationAction(quotationId: string): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase } = ctx
 
   const { data: quot } = await supabase
     .from('quotations_v2').select('*').eq('id', quotationId).single()
@@ -201,8 +204,11 @@ export async function createProformaFromQuotationAction(quotationId: string) {
   })
 }
 
-export async function deleteProformaAction(id: string) {
-  const supabase = await createClient()
+export async function deleteProformaAction(id: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isAdmin) return { error: 'Seul un administrateur peut supprimer une proforma' }
+  const { supabase } = ctx
   await supabase.from('proforma_lines').delete().eq('proforma_id', id)
   const { error } = await supabase.from('proformas_v2').delete().eq('id', id)
   if (error) return { error: error.message }
@@ -210,8 +216,11 @@ export async function deleteProformaAction(id: string) {
   return { success: true }
 }
 
-export async function getProformaForPdfAction(id: string) {
-  const supabase = await createClient()
+export async function getProformaForPdfAction(id: string): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase } = ctx
 
   const { data: proforma, error } = await supabase
     .from('proformas_v2')

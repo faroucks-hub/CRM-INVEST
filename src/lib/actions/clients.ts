@@ -1,8 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
 
 const clientSchema = z.object({
   company_name:     z.string().min(1, 'Nom requis'),
@@ -30,10 +30,10 @@ const clientSchema = z.object({
 
 export type ClientFormData = z.infer<typeof clientSchema>
 
-export async function createClientAction(data: ClientFormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createClientAction(data: ClientFormData): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
 
   const parsed = clientSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.errors[0].message }
@@ -50,7 +50,7 @@ if (refError) {
       ...parsed.data,
       reference:     refData ?? `CL-${Date.now()}`,
       created_by:    user.id,
-      assigned_to:   parsed.data.assigned_to || null,
+      assigned_to:   ctx.role === 'commercial' ? user.id : (parsed.data.assigned_to || user.id),
       website:       parsed.data.website || null,
       contact_email: parsed.data.contact_email || null,
     })
@@ -68,10 +68,15 @@ if (refError) {
   return { data: created }
 }
 
-export async function updateClientAction(id: string, data: Partial<ClientFormData>) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function updateClientAction(id: string, data: Partial<ClientFormData>): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('clients').select('assigned_to').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id) return roleDenied()
+    delete data.assigned_to
+  }
 
   const { data: updated, error } = await supabase
     .from('clients')
@@ -86,8 +91,14 @@ export async function updateClientAction(id: string, data: Partial<ClientFormDat
   return { data: updated }
 }
 
-export async function archiveClientAction(id: string) {
-  const supabase = await createClient()
+export async function archiveClientAction(id: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('clients').select('assigned_to').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id) return roleDenied()
+  }
   const { error } = await supabase
     .from('clients')
     .update({ is_archived: true })

@@ -198,7 +198,9 @@ const router = useRouter()
                 {actionMenu===String(row.id)&&(
                   <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-100 rounded-lg shadow-lg z-20 py-1 animate-fade-up" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>handleDuplicate(String(row.id))} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><Copy className="w-4 h-4"/> Dupliquer</button>
-                    {(STATUS_FLOW[String(row.status) as QuotationStatus]??[]).map(s=>(
+                    {(STATUS_FLOW[String(row.status) as QuotationStatus]??[])
+                      .filter(s => role !== 'commercial' || ['brouillon','envoyee','perdue'].includes(s))
+                      .map(s=>(
                       <button key={s} onClick={()=>handleStatusChange(String(row.id),s)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         {s==='approuvee'?<CheckCircle className="w-4 h-4 text-green-500"/>:s==='perdue'?<XCircle className="w-4 h-4 text-red-400"/>:<Send className="w-4 h-4 text-blue-500"/>}
                         → {QUOTATION_STATUS_LABELS[s]}
@@ -209,7 +211,7 @@ const router = useRouter()
                         <Plus className="w-4 h-4"/> Créer proforma
                       </button>
                     )}
-                    {isAdminOrLead&&<button onClick={()=>{setDelete(row);setActionMenu(null)}} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-gray-100"><XCircle className="w-4 h-4"/> Supprimer</button>}
+                    {role==='admin'&&<button onClick={()=>{setDelete(row);setActionMenu(null)}} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-gray-100"><XCircle className="w-4 h-4"/> Supprimer</button>}
                   </div>
                 )}
               </div>

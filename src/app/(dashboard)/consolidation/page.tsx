@@ -32,20 +32,27 @@ export default async function ConsolidationPage() {
     supabase.from('supplier_payments').select('project_id,amount,currency,transaction_type,voided_at').is('voided_at',null),
   ])
 
+  const visibleProjects = projects.data ?? []
+  const visibleProjectIds = new Set(visibleProjects.map(project => String(project.id)))
+  const visibleQuotationIds = new Set(visibleProjects.map(project => project.quotation_id).filter(Boolean).map(String))
+  const visibleProformaIds = new Set(visibleProjects.map(project => project.proforma_id).filter(Boolean).map(String))
+  const ownProjectRows = <T extends { project_id?: unknown }>(rows: T[] | null) =>
+    (rows ?? []).filter(row => row.project_id && visibleProjectIds.has(String(row.project_id)))
+
   return <BusinessConsolidationClient
     role={role}
-    projects={projects.data ?? []}
-    quotations={quotations.data ?? []}
-    proformas={proformas.data ?? []}
-    orders={orders.data ?? []}
-    supplierQuotes={supplierQuotes.data ?? []}
-    supplierProformas={supplierProformas.data ?? []}
-    execution={execution.data ?? []}
-    controls={controls.data ?? []}
-    checklist={checklist.data ?? []}
-    documents={documents.data ?? []}
-    customerPayments={customerPayments.data ?? []}
-    supplierInvoices={supplierInvoices.data ?? []}
-    supplierPayments={supplierPayments.data ?? []}
+    projects={visibleProjects}
+    quotations={(quotations.data ?? []).filter(row => role !== 'commercial' || visibleQuotationIds.has(String(row.id)))}
+    proformas={(proformas.data ?? []).filter(row => role !== 'commercial' || visibleProformaIds.has(String(row.id)))}
+    orders={role === 'commercial' ? [] : orders.data ?? []}
+    supplierQuotes={role === 'commercial' ? [] : supplierQuotes.data ?? []}
+    supplierProformas={role === 'commercial' ? [] : supplierProformas.data ?? []}
+    execution={role === 'commercial' ? ownProjectRows(execution.data) : execution.data ?? []}
+    controls={role === 'commercial' ? [] : controls.data ?? []}
+    checklist={role === 'commercial' ? ownProjectRows(checklist.data) : checklist.data ?? []}
+    documents={role === 'commercial' ? ownProjectRows(documents.data) : documents.data ?? []}
+    customerPayments={role === 'commercial' ? ownProjectRows(customerPayments.data) : customerPayments.data ?? []}
+    supplierInvoices={role === 'commercial' ? [] : supplierInvoices.data ?? []}
+    supplierPayments={role === 'commercial' ? [] : supplierPayments.data ?? []}
   />
 }

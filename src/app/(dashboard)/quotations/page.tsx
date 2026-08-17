@@ -12,7 +12,7 @@ export default async function QuotationsPage() {
 
   const role = profile?.role ?? 'commercial'
   const isAdminOrLead = role === 'admin' || role === 'lead_team'
-  const quotationFields = role === 'admin'
+  const quotationFields = isAdminOrLead
     ? `id, number, status, issued_date, valid_until, currency,
        subtotal, discount_global, total_sell, total_buy, margin_pct,
        sent_at, approved_at, created_at, updated_at,
@@ -68,7 +68,7 @@ export default async function QuotationsPage() {
       users={users ?? []}
       role={role}
       isAdminOrLead={isAdminOrLead}
-      canSeeCosts={role === 'admin'}
+      canSeeCosts={isAdminOrLead}
       currentUserId={user!.id}
       termsProfiles={termsProfiles ?? []}
     />

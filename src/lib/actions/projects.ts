@@ -1,8 +1,8 @@
 'use server'
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { WORKFLOW_STEPS } from '@/types/sprint4'
+import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
 
 export interface ProjectPayload {
   name:string; client_id:string; assigned_to?:string;
@@ -16,10 +16,11 @@ export interface ProjectPayload {
   commercial_role?:'facilitation'|'resale'|'distribution'; terms_profile_id?:string; terms_code?:string; terms_version?:string; terms_snapshot?:string;
 }
 
-export async function createProjectAction(data: ProjectPayload) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createProjectAction(data: ProjectPayload): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase, user } = ctx
 
   // Génère référence
   const { data: ref } = await supabase.rpc('generate_project_reference_v2')
@@ -75,10 +76,11 @@ export async function createProjectAction(data: ProjectPayload) {
   return { data: project }
 }
 
-export async function updateProjectAction(id: string, data: Partial<ProjectPayload> & { status?: string; progress_pct?: number }) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function updateProjectAction(id: string, data: Partial<ProjectPayload> & { status?: string; progress_pct?: number }): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase } = ctx
 
   const { data: updated, error } = await supabase
     .from('projets_v2')
@@ -98,8 +100,11 @@ export async function updateProjectAction(id: string, data: Partial<ProjectPaylo
   return { data: updated }
 }
 
-export async function deleteProjectAction(id: string) {
-  const supabase = await createClient()
+export async function deleteProjectAction(id: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isAdmin) return { error: 'Seul un administrateur peut supprimer un projet' }
+  const { supabase } = ctx
   await supabase.from('project_workflow_steps').delete().eq('project_id', id)
   const { error } = await supabase.from('projets_v2').delete().eq('id', id)
   if (error) return { error: error.message }
@@ -110,10 +115,20 @@ export async function deleteProjectAction(id: string) {
 export async function updateWorkflowStepAction(stepId: string, data: {
   status?:string; deadline?:string; completed_at?:string;
   responsible_id?:string; comment?:string; is_blocked?:boolean; block_reason?:string;
-}) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+}): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+
+  if (ctx.role === 'commercial') {
+    const { data: ownedStep } = await supabase
+      .from('project_workflow_steps')
+      .select('project:project_id(assigned_to)')
+      .eq('id', stepId)
+      .single()
+    const project = Array.isArray(ownedStep?.project) ? ownedStep.project[0] : ownedStep?.project
+    if (!project || project.assigned_to !== user.id) return roleDenied()
+  }
 
   const updateData: Record<string,unknown> = { ...data }
   if (data.status === 'termine' && !data.completed_at) {
@@ -157,10 +172,11 @@ export async function updateWorkflowStepAction(stepId: string, data: {
   return { success: true }
 }
 
-export async function createProjectFromProformaAction(proformaId: string) {  
-const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createProjectFromProformaAction(proformaId: string): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase } = ctx
 
   const { data: prof } = await supabase
     .from('proformas_v2').select('*').eq('id', proformaId).single()

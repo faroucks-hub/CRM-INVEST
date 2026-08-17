@@ -1,8 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
 
 const oppSchema = z.object({
   name:             z.string().min(1, 'Nom requis'),
@@ -24,10 +24,10 @@ const oppSchema = z.object({
 
 export type OppFormData = z.infer<typeof oppSchema>
 
-export async function createOpportunityAction(data: OppFormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createOpportunityAction(data: OppFormData): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
 
   const parsed = oppSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.errors[0].message }
@@ -38,7 +38,7 @@ export async function createOpportunityAction(data: OppFormData) {
       ...parsed.data,
       stage:       'prospect',
       created_by:  user.id,
-      assigned_to: parsed.data.assigned_to || null,
+      assigned_to: ctx.role === 'commercial' ? user.id : (parsed.data.assigned_to || user.id),
     })
     .select()
     .single()
@@ -48,10 +48,15 @@ export async function createOpportunityAction(data: OppFormData) {
   return { data: created }
 }
 
-export async function updateOpportunityAction(id: string, data: Partial<OppFormData & { pipeline_stage: string }>) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function updateOpportunityAction(id: string, data: Partial<OppFormData & { pipeline_stage: string }>): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('opportunities').select('assigned_to').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id) return roleDenied()
+    delete data.assigned_to
+  }
 
   const { data: updated, error } = await supabase
     .from('opportunities')
@@ -65,8 +70,14 @@ export async function updateOpportunityAction(id: string, data: Partial<OppFormD
   return { data: updated }
 }
 
-export async function deleteOpportunityAction(id: string) {
-  const supabase = await createClient()
+export async function deleteOpportunityAction(id: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('opportunities').select('assigned_to').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id) return roleDenied()
+  }
   const { error } = await supabase
     .from('opportunities')
     .update({ pipeline_stage: 'perdu_annule' })
@@ -76,8 +87,14 @@ export async function deleteOpportunityAction(id: string) {
   return { success: true }
 }
 
-export async function movePipelineStageAction(id: string, stage: string) {
-  const supabase = await createClient()
+export async function movePipelineStageAction(id: string, stage: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('opportunities').select('assigned_to').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id) return roleDenied()
+  }
   const { error } = await supabase
     .from('opportunities')
     .update({ pipeline_stage: stage })

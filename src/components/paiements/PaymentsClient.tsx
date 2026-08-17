@@ -190,8 +190,8 @@ export default function PaymentsClient({ payments, transactions, clients, projec
           pageSize={25} emptyMessage="Aucun paiement" emptySubtext="Créez votre premier suivi de paiement"
           actions={row=>(
             <div className="flex items-center gap-1">
-              <button onClick={()=>{setEditPay(row);setModalOpen(true)}} className="btn-icon p-1.5"><Edit className="w-3.5 h-3.5"/></button>
-              {isAdminOrLead&&<button onClick={()=>setDelete(row)} className="btn-icon p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5"/></button>}
+              {isAdminOrLead&&<button onClick={()=>{setEditPay(row);setModalOpen(true)}} className="btn-icon p-1.5"><Edit className="w-3.5 h-3.5"/></button>}
+              {role==='admin'&&<button onClick={()=>setDelete(row)} className="btn-icon p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5"/></button>}
             </div>
           )}
         />

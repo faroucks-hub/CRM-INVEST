@@ -1,6 +1,6 @@
 'use server'
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
 
 export interface PaymentPayload {
   client_id:string; project_id?:string; proforma_id?:string; assigned_to?:string;
@@ -25,10 +25,11 @@ function validatePayment(data: Pick<PaymentPayload, 'total_amount' | 'deposit_ex
   return null
 }
 
-export async function createPaymentAction(data: PaymentPayload) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function createPaymentAction(data: PaymentPayload): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase, user } = ctx
   const invalid = validatePayment(data)
   if (invalid) return { error: invalid }
 
@@ -64,10 +65,11 @@ export async function createPaymentAction(data: PaymentPayload) {
   return { data: payment }
 }
 
-export async function updatePaymentAction(id: string, data: Partial<PaymentPayload>) {
-  const supabase = await createClient()
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
+export async function updatePaymentAction(id: string, data: Partial<PaymentPayload>): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isPrivileged) return roleDenied()
+  const { supabase } = ctx
 
   const { data: current, error: currentError } = await supabase
     .from('paiements')
@@ -103,8 +105,11 @@ export async function updatePaymentAction(id: string, data: Partial<PaymentPaylo
   return { data: updated }
 }
 
-export async function deletePaymentAction(id: string) {
-  const supabase = await createClient()
+export async function deletePaymentAction(id: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isAdmin) return { error: 'Seul un administrateur peut supprimer un paiement' }
+  const { supabase } = ctx
   const { error } = await supabase.from('paiements').delete().eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/paiements')

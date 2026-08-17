@@ -7,7 +7,7 @@ export default async function ControleAffairesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase.from('users_profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['admin', 'lead_team', 'commercial'].includes(profile.role)) redirect('/dashboard')
+  if (!profile || !['admin', 'lead_team'].includes(profile.role)) redirect('/dashboard')
 
   const [projects, orders, supplierQuotes, expenses, supplierPayments, customerPayments, controls, suppliers] = await Promise.all([
     supabase.from('projets_v2').select('id,reference,name,status,contract_value,currency,order_date,expected_delivery,incoterm,warranty_months,commercial_role,terms_code,terms_version,quotation_id,proforma_id,client:client_id(company_name)').order('created_at', { ascending: false }).limit(300),

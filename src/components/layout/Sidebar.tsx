@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import {
   LayoutDashboard, Users, Building2, TrendingUp, FolderKanban,
   Calculator, CreditCard, FileText, Receipt, Settings, Zap,
-  Sparkles, CheckSquare, HelpCircle, ClipboardList, Bell, BarChart3, ShoppingCart, Scale, Activity,
+  Sparkles, CheckSquare, HelpCircle, ClipboardList, Bell, BarChart3, ShoppingCart, Scale, Activity, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -25,8 +26,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   // ── Principal
-  { href:'/dashboard',    label:'Dashboard',          icon:LayoutDashboard, roles:['admin','lead_team','commercial'], section:'principal' },
-  { href:'/calculateurs', label:'Calculateurs',        icon:Calculator,      roles:['admin','lead_team','commercial'], section:'principal' },
+  { href:'/dashboard',    label:'Dashboard',          icon:LayoutDashboard, roles:['admin','lead_team','commercial'], section:'accueil' },
   // ── Commercial
   { href:'/clients',      label:'Clients & Prospects', icon:Users,           roles:['admin','lead_team','commercial'], section:'commercial' },
   { href:'/opportunites', label:'Opportunités',         icon:TrendingUp,      roles:['admin','lead_team','commercial'], section:'commercial' },
@@ -47,15 +47,16 @@ const NAV_ITEMS: NavItem[] = [
   // ── Partenaires
   { href:'/partenaires',   label:'Partenaires',         icon:Building2,       roles:['admin','lead_team'],              section:'partenaires' },
   { href:'/achats',         label:'Achats & Commandes',  icon:ShoppingCart,    roles:['admin','lead_team'],              section:'partenaires' },
-  { href:'/controle-affaires', label:'Contrôle d’affaires', icon:Scale, roles:['admin','lead_team','commercial'], section:'partenaires' },
+  { href:'/controle-affaires', label:'Contrôle d’affaires', icon:Scale, roles:['admin','lead_team'], section:'pilotage' },
   // ── Pilotage
   { href:'/consolidation', label:'Consolidation affaires', icon:Activity, roles:['admin','lead_team','commercial'], section:'pilotage' },
   { href:'/rapports',     label:'Rapports & Performance', icon:BarChart3,     roles:['admin','lead_team','commercial'], section:'pilotage' },
   // ── Lydie AI
-  { href:'/notifications', label:'Notifications',         icon:Bell,            roles:['admin','lead_team','commercial'], section:'ia' },
-  { href:'/taches',       label:'Tâches',               icon:CheckSquare,     roles:['admin','lead_team','commercial'], section:'ia' },
-  { href:'/lydie',        label:'Lydie AI',             icon:Sparkles,        roles:['admin','lead_team','commercial'], section:'ia' },
-  { href:'/aide',         label:'Aide',                 icon:HelpCircle,      roles:['admin','lead_team','commercial'], section:'ia' },
+  { href:'/taches',       label:'Tâches',               icon:CheckSquare,     roles:['admin','lead_team','commercial'], section:'outils' },
+  { href:'/notifications', label:'Notifications',       icon:Bell,            roles:['admin','lead_team','commercial'], section:'outils' },
+  { href:'/calculateurs', label:'Calculateurs',         icon:Calculator,      roles:['admin','lead_team','commercial'], section:'outils' },
+  { href:'/lydie',        label:'Lydie AI',             icon:Sparkles,        roles:['admin','lead_team','commercial'], section:'outils' },
+  { href:'/aide',         label:"Guide d'utilisation", icon:HelpCircle,      roles:['admin','lead_team','commercial'], section:'assistance' },
   // ── Admin
   { href:'/parametres',        label:'Paramètres',              icon:Settings,       roles:['admin'], section:'admin' },
   { href:'/parametres/utilisateurs', label:'Utilisateurs',           icon:Users,          roles:['admin'], section:'admin' },
@@ -63,12 +64,13 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 const SECTION_LABELS: Record<string, string> = {
-  principal:   '',
-  commercial:  'Commercial',
-  operations:  'Opérations',
-  partenaires: 'Partenaires',
+  accueil:     'Accueil',
+  commercial:  'Développement commercial',
+  operations:  'Exécution',
+  partenaires: 'Achats & partenaires',
   pilotage:    'Pilotage',
-  ia:          'Intelligence',
+  outils:      'Outils',
+  assistance: 'Assistance',
   admin:       'Administration',
 }
 
@@ -84,6 +86,10 @@ export default function Sidebar({ role }: SidebarProps) {
     acc[item.section].push(item)
     return acc
   }, {})
+  const activeSection = visible.find(item => item.href === '/dashboard'
+    ? pathname === '/dashboard'
+    : pathname.startsWith(item.href))?.section
+  const [closedSections, setClosedSections] = useState<Record<string, boolean>>({})
 
   return (
     <aside className="w-56 flex-shrink-0 bg-navy-900 flex flex-col h-full">
@@ -115,13 +121,16 @@ export default function Sidebar({ role }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
         {Object.entries(sections).map(([section, items]) => (
           <div key={section}>
-            {SECTION_LABELS[section] && (
-              <div className="px-2 mb-1.5 text-2xs font-semibold uppercase
-                             tracking-widest text-white/20">
-                {SECTION_LABELS[section]}
-              </div>
-            )}
-            <ul className="space-y-0.5">
+            <button
+              type="button"
+              onClick={() => setClosedSections(current => ({ ...current, [section]: !current[section] }))}
+              className="w-full px-2 mb-1.5 flex items-center justify-between text-2xs font-semibold uppercase tracking-widest text-white/25 hover:text-white/50"
+              aria-expanded={!closedSections[section] || activeSection === section}
+            >
+              <span>{SECTION_LABELS[section]}</span>
+              <ChevronDown className={cn('h-3 w-3 transition-transform', closedSections[section] && activeSection !== section && '-rotate-90')} />
+            </button>
+            <ul className={cn('space-y-0.5', closedSections[section] && activeSection !== section && 'hidden')}>
               {items.map((item) => {
                 const isActive = item.href === '/dashboard'
                   ? pathname === '/dashboard'

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { QuotationLine } from '@/types/sprint3'
+import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
 
 export interface QuotationPayload {
   client_id: string
@@ -80,7 +81,7 @@ async function resolveCustomerTerms(supabase: any, profileId?: string) {
   }
 }
 
-export async function getQuotationTemplate(templateId: string) {
+export async function getQuotationTemplate(templateId: string): Promise<ActionResult<any>> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -96,16 +97,10 @@ export async function getQuotationTemplate(templateId: string) {
   return { data }
 }
 
-export async function createQuotationAction(data: QuotationPayload) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Non authentifié' }
-  }
+export async function createQuotationAction(data: QuotationPayload): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
 
   const { data: number, error: numErr } = await supabase.rpc(
     'get_next_doc_number',
@@ -156,7 +151,7 @@ export async function createQuotationAction(data: QuotationPayload) {
 
       client_id: data.client_id,
       opportunity_id: data.opportunity_id || null,
-      assigned_to: data.assigned_to || null,
+      assigned_to: ctx.role === 'commercial' ? user.id : (data.assigned_to || user.id),
 
       template_id: data.template_id || null,
       quotation_type:
@@ -241,15 +236,17 @@ export async function createQuotationAction(data: QuotationPayload) {
 export async function updateQuotationAction(
   id: string,
   data: Partial<QuotationPayload> & { status?: string }
-) {
-  const supabase = await createClient()
+): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Non authentifié' }
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('quotations_v2')
+      .select('assigned_to,status').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id || owned.status !== 'brouillon') return roleDenied()
+    delete data.assigned_to
+    delete data.internal_notes
   }
 
   const updateData: Record<string, unknown> = { ...data }
@@ -334,16 +331,10 @@ export async function updateQuotationAction(
   return { data: updated }
 }
 
-export async function duplicateQuotationAction(id: string) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Non authentifié' }
-  }
+export async function duplicateQuotationAction(id: string): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
 
   const { data: original } = await supabase
     .from('quotations_v2')
@@ -354,6 +345,7 @@ export async function duplicateQuotationAction(id: string) {
   if (!original) {
     return { error: 'Quotation introuvable' }
   }
+  if (ctx.role === 'commercial' && original.assigned_to !== user.id) return roleDenied()
 
   const { data: lines } = await supabase
     .from('quotation_lines')
@@ -382,6 +374,7 @@ export async function duplicateQuotationAction(id: string) {
       ...rest,
       number,
       status: 'brouillon',
+      assigned_to: ctx.role === 'commercial' ? user.id : original.assigned_to,
       created_by: user.id,
       issued_date: new Date().toISOString().split('T')[0],
     })
@@ -417,8 +410,20 @@ export async function changeQuotationStatusAction(
   id: string,
   status: string,
   reason?: string
-) {
-  const supabase = await createClient()
+): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+
+  const allowedStatuses = ctx.role === 'commercial'
+    ? ['brouillon', 'envoyee', 'perdue']
+    : ['brouillon', 'envoyee', 'approuvee', 'refusee', 'expiree', 'perdue']
+  if (!allowedStatuses.includes(status)) return roleDenied()
+  if (ctx.role === 'commercial') {
+    const { data: owned } = await supabase.from('quotations_v2')
+      .select('assigned_to').eq('id', id).single()
+    if (!owned || owned.assigned_to !== user.id) return roleDenied()
+  }
 
   const extra: Record<string, unknown> = { status }
 
@@ -453,8 +458,11 @@ export async function changeQuotationStatusAction(
   return { success: true }
 }
 
-export async function deleteQuotationAction(id: string) {
-  const supabase = await createClient()
+export async function deleteQuotationAction(id: string): Promise<ActionResult> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  if (!ctx.isAdmin) return { error: 'Seul un administrateur peut supprimer un devis' }
+  const { supabase } = ctx
 
   await supabase
     .from('quotation_lines')
@@ -475,24 +483,16 @@ export async function deleteQuotationAction(id: string) {
   return { success: true }
 }
 
-export async function getQuotationDetailsAction(id: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function getQuotationDetailsAction(id: string): Promise<ActionResult<any>> {
+  const ctx = await getActionContext()
+  if (!ctx.ok) return { error: ctx.error }
+  const { supabase, user } = ctx
+  const canSeeCosts = ctx.isPrivileged
 
-  if (!user) {
-    return { error: 'Non authentifié' }
-  }
-
-  const { data: profile } = await supabase
-    .from('users_profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  const isAdmin = profile?.role === 'admin'
-
-  const { data, error } = await supabase
+  const quotationDb = supabase as any
+  const { data, error } = await quotationDb
     .from('quotations_v2')
-    .select(isAdmin
+    .select(canSeeCosts
       ? '*, lines:quotation_lines(*)'
       : `id, number, status, issued_date, valid_until, currency,
          subtotal, discount_global, total_sell, payment_terms,
@@ -509,6 +509,7 @@ export async function getQuotationDetailsAction(id: string) {
   if (error) {
     return { error: error.message }
   }
+  if (ctx.role === 'commercial' && data.assigned_to !== user.id) return roleDenied()
 
   return { data }
 }
