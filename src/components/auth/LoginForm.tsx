@@ -62,11 +62,11 @@ window.location.href = '/dashboard'
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4" noValidate>
 
       {/* Email */}
       <div>
-        <label className="block text-xs font-medium text-white/50 mb-1.5">
+        <label className="block text-xs font-medium text-white/65 mb-1.5">
           Adresse email
         </label>
         <input
@@ -77,8 +77,8 @@ window.location.href = '/dashboard'
           autoComplete="email"
           disabled={loading}
           className={cn(
-            'w-full px-3.5 py-2.5 bg-white/5 border rounded-md text-sm text-white',
-            'placeholder-white/20 outline-none transition-all duration-150',
+            'w-full px-3.5 py-2.5 bg-white/5 border rounded-md text-base sm:text-sm text-white',
+            'placeholder-white/30 outline-none transition-all duration-150',
             'focus:ring-2 focus:ring-gold-400/30 focus:border-gold-400',
             'disabled:opacity-50',
             'border-white/10'
@@ -88,7 +88,7 @@ window.location.href = '/dashboard'
 
       {/* Password */}
       <div>
-        <label className="block text-xs font-medium text-white/50 mb-1.5">
+        <label className="block text-xs font-medium text-white/65 mb-1.5">
           Mot de passe
         </label>
         <div className="relative">
@@ -100,8 +100,8 @@ window.location.href = '/dashboard'
             autoComplete="current-password"
             disabled={loading}
             className={cn(
-              'w-full px-3.5 py-2.5 pr-10 bg-white/5 border rounded-md text-sm text-white',
-              'placeholder-white/20 outline-none transition-all duration-150',
+              'w-full px-3.5 py-2.5 pr-10 bg-white/5 border rounded-md text-base sm:text-sm text-white',
+              'placeholder-white/30 outline-none transition-all duration-150',
               'focus:ring-2 focus:ring-gold-400/30 focus:border-gold-400',
               'disabled:opacity-50',
               'border-white/10'
@@ -147,7 +147,7 @@ window.location.href = '/dashboard'
       <div className="text-center">
         <Link
           href="/reset-password"
-          className="text-xs text-white/30 hover:text-gold-400 transition-colors"
+          className="text-xs text-white/55 hover:text-gold-400 transition-colors"
         >
           Mot de passe oublié ?
         </Link>

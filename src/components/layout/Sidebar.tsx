@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, Building2, TrendingUp, FolderKanban,
   CreditCard, FileText, Receipt, Settings, Zap,
-  Sparkles, HelpCircle, ClipboardList, BarChart3, ShoppingCart, Scale, Activity, ChevronDown,
+  Sparkles, HelpCircle, ClipboardList, BarChart3, ShoppingCart, Scale, Activity, ChevronDown, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -75,6 +75,7 @@ interface SidebarProps { role: UserRole }
 
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const visible = NAV_ITEMS.filter(item => !item.roles || item.roles.includes(role))
 
@@ -88,11 +89,25 @@ export default function Sidebar({ role }: SidebarProps) {
     : pathname.startsWith(item.href))?.section
   const [closedSections, setClosedSections] = useState<Record<string, boolean>>({})
 
+  useEffect(() => {
+    function openMobileSidebar() { setMobileOpen(true) }
+    window.addEventListener('open-mobile-sidebar', openMobileSidebar)
+    return () => window.removeEventListener('open-mobile-sidebar', openMobileSidebar)
+  }, [])
+
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+
   return (
-    <aside className="w-56 flex-shrink-0 bg-navy-900 flex flex-col h-full">
+    <>
+      {mobileOpen && <button type="button" aria-label="Fermer le menu" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-[60] bg-navy-950/45 backdrop-blur-sm lg:hidden" />}
+    <aside className={cn(
+      'fixed inset-y-0 left-0 z-[70] flex h-dvh w-[min(18rem,calc(100vw-2.5rem))] flex-shrink-0 flex-col bg-navy-900 transition-transform duration-200',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full',
+      'lg:static lg:h-full lg:w-56 lg:translate-x-0'
+    )}>
 
       {/* Logo */}
-<div className="px-4 py-5 border-b border-white/5">
+<div className="relative px-4 py-5 border-b border-white/5">
   <div className="flex items-center gap-3">
     <Image
       src="/images/logo-ime.png"
@@ -112,6 +127,7 @@ export default function Sidebar({ role }: SidebarProps) {
       </div>
     </div>
   </div>
+  <button type="button" onClick={() => setMobileOpen(false)} className="absolute right-2 top-2 rounded-lg p-2 text-white/40 hover:bg-white/5 hover:text-white lg:hidden" aria-label="Fermer le menu"><X className="h-5 w-5" /></button>
 </div>
 
       {/* Navigation */}
@@ -139,6 +155,7 @@ export default function Sidebar({ role }: SidebarProps) {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={() => setMobileOpen(false)}
                       className={cn(
                         'flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm',
                         'transition-all duration-150 group relative',
@@ -202,5 +219,6 @@ export default function Sidebar({ role }: SidebarProps) {
       </div>
 
     </aside>
+    </>
   )
 }

@@ -289,8 +289,8 @@ export default function LydieChat({ user }: Props) {
     LYDIE_SUGGESTIONS[user.role] ?? LYDIE_SUGGESTIONS.commercial
 
   const panelClass = expanded
-    ? 'fixed inset-4 sm:inset-8 z-[60]'
-    : 'fixed bottom-4 right-4 w-[420px] max-h-[520px] z-[60]'
+    ? 'fixed inset-2 sm:inset-8 z-[60]'
+    : 'fixed bottom-2 right-2 w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] sm:bottom-4 sm:right-4 sm:w-[420px] sm:max-h-[520px] z-[60]'
 
   return (
     <>
@@ -365,7 +365,7 @@ export default function LydieChat({ user }: Props) {
               'animate-fade-up'
             )}
           >
-            <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 border-b border-white/5">
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-gradient-to-r from-navy-900 to-navy-800 border-b border-white/5 sm:gap-3 sm:px-4 sm:py-3.5">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gold-400 to-gold-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <Sparkles className="w-4.5 h-4.5 text-navy-900" />
               </div>
@@ -528,7 +528,7 @@ export default function LydieChat({ user }: Props) {
             </div>
 
             {messages.length <= 1 && (
-              <div className="flex-shrink-0 px-4 pb-2 grid grid-cols-2 gap-1.5">
+              <div className="flex-shrink-0 px-3 pb-2 grid grid-cols-1 gap-1.5 sm:px-4 sm:grid-cols-2">
                 {suggestions.map(([icon, text]) => (
                   <button
                     key={text}
@@ -547,7 +547,7 @@ export default function LydieChat({ user }: Props) {
               </div>
             )}
 
-            <div className="flex-shrink-0 px-4 pb-4">
+            <div className="flex-shrink-0 px-3 pb-3 sm:px-4 sm:pb-4">
               <div
                 className={cn(
                   'flex items-end gap-2 bg-white rounded-2xl',

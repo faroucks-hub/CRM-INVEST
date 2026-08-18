@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { LogOut, User, ChevronDown, CheckSquare, Calculator } from 'lucide-react'
+import { LogOut, User, ChevronDown, CheckSquare, Calculator, Menu } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn, getInitials } from '@/lib/utils'
@@ -25,19 +25,22 @@ export default function TopBar({ user }: TopBarProps) {
 
   return (
     <header className="h-14 bg-white border-b border-gray-100 flex items-center
-                       justify-between px-6 flex-shrink-0">
+                       justify-between px-2.5 sm:px-6 flex-shrink-0">
       {/* Left */}
-      <div className="flex flex-col leading-tight">
-        <div className="text-sm font-semibold text-navy-900 tracking-wide">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
+        <button type="button" onClick={() => window.dispatchEvent(new Event('open-mobile-sidebar'))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 lg:hidden" aria-label="Ouvrir le menu"><Menu className="h-5 w-5" /></button>
+        <div className="min-w-0 flex flex-col leading-tight">
+        <div className="truncate text-xs font-semibold text-navy-900 tracking-wide sm:text-sm">
           IM ÉNERGIE CRM
         </div>
-        <div className="text-[11px] text-gray-400">
+        <div className="hidden text-[11px] text-gray-400 sm:block">
           Business Management System
+        </div>
         </div>
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-2">
 
         <Link
           href="/taches"
@@ -82,7 +85,7 @@ export default function TopBar({ user }: TopBarProps) {
               <div className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[user.role]}</div>
             </div>
             <ChevronDown className={cn(
-              'w-3.5 h-3.5 text-gray-400 transition-transform duration-150',
+              'hidden sm:block w-3.5 h-3.5 text-gray-400 transition-transform duration-150',
               menuOpen && 'rotate-180'
             )} />
           </button>
