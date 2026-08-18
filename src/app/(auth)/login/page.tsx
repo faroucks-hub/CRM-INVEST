@@ -94,8 +94,8 @@ export default async function LoginPage({
       </div>
 
       {/* ── Panneau droit — formulaire ────────────────── */}
-      <div className="flex-1 flex items-start justify-center px-5 py-5 sm:items-center sm:p-8">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex items-center justify-center px-4 py-5 sm:p-8">
+        <div className="w-[min(82vw,320px)] sm:w-full sm:max-w-sm">
 
           <div className="flex flex-col items-center mb-4 text-center sm:mb-8">
   <Image
