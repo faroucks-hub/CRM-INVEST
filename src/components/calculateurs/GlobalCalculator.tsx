@@ -91,14 +91,14 @@ function SimpleCalculator() {
   const keys = ['7','8','9','÷','4','5','6','×','1','2','3','−','0','.','=','+']
 
   return (
-    <div className="mx-auto max-w-sm rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 rounded-xl bg-navy-900 px-4 py-5 text-right">
+    <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-5">
+      <div className="mb-2 rounded-xl bg-navy-900 px-3 py-3 text-right sm:mb-4 sm:px-4 sm:py-5">
         <div className="h-5 text-xs text-white/40">{stored !== null ? `${stored} ${operator ?? ''}` : 'Calcul rapide'}</div>
-        <div className="mt-1 overflow-hidden text-ellipsis text-3xl font-semibold text-white">{display}</div>
+        <div className="mt-1 overflow-hidden text-ellipsis text-2xl font-semibold text-white sm:text-3xl">{display}</div>
       </div>
       <div className="mb-2 grid grid-cols-2 gap-2">
-        <button type="button" onClick={clear} className="rounded-lg bg-gray-100 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-200">Effacer</button>
-        <button type="button" onClick={() => navigator.clipboard.writeText(display)} className="rounded-lg bg-gold-400/15 py-3 text-sm font-semibold text-gold-700 hover:bg-gold-400/25">Copier</button>
+        <button type="button" onClick={clear} className="rounded-lg bg-gray-100 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 sm:py-3 sm:text-sm">Effacer</button>
+        <button type="button" onClick={() => navigator.clipboard.writeText(display)} className="rounded-lg bg-gold-400/15 py-2 text-xs font-semibold text-gold-700 hover:bg-gold-400/25 sm:py-3 sm:text-sm">Copier</button>
       </div>
       <div className="grid grid-cols-4 gap-2">
         {keys.map(key => (
@@ -107,7 +107,7 @@ function SimpleCalculator() {
             type="button"
             onClick={() => key === '.' ? inputDecimal() : key === '=' ? equals() : ['+','−','×','÷'].includes(key) ? chooseOperator(key) : inputDigit(key)}
             className={cn(
-              'rounded-lg py-4 text-base font-semibold transition-colors',
+              'rounded-lg py-2.5 text-sm font-semibold transition-colors sm:py-4 sm:text-base',
               key === '=' ? 'bg-gold-400 text-navy-900 hover:bg-gold-500' :
               ['+','−','×','÷'].includes(key) ? 'bg-navy-900 text-white hover:bg-navy-800' : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
             )}
@@ -180,11 +180,11 @@ export default function GlobalCalculator() {
       {open && (
         <div className="pointer-events-none fixed inset-0 z-[70] p-2 sm:p-4">
           <section
-            className="global-calculator-panel pointer-events-auto absolute bottom-2 right-2 flex h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-surface-100 shadow-2xl animate-fade-up sm:bottom-4 sm:right-4"
+            className="global-calculator-panel pointer-events-auto absolute bottom-2 right-2 flex h-[78dvh] max-h-[680px] w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-surface-100 shadow-2xl animate-fade-up sm:bottom-4 sm:right-4"
             style={{ '--calculator-width': `${panelWidth}px`, '--calculator-height': `${panelHeight}px` } as CSSProperties}
           >
             <button type="button" onPointerDown={event => startResize('both', event)} className="absolute bottom-2 left-2 z-30 hidden h-8 w-8 cursor-nesw-resize touch-none items-center justify-center rounded-lg border border-gold-400/40 bg-navy-900 text-gold-400 shadow-md sm:flex" aria-label="Redimensionner la fenêtre" title="Tirer pour redimensionner"><Scaling className="h-4 w-4" /></button>
-            <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+            <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 sm:h-14 sm:px-4">
               <div className="flex min-w-0 items-center gap-3">
                 {tool && <button type="button" onClick={() => setTool(null)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ArrowLeft className="h-5 w-5" /></button>}
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-navy-900"><Calculator className="h-4 w-4 text-gold-400" /></div>
@@ -206,14 +206,14 @@ export default function GlobalCalculator() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+            <div className="flex-1 overflow-y-auto p-2.5 sm:p-4">
               {!tool && (
                 <div className="mx-auto max-w-md">
-                  <div className="mb-3"><h3 className="text-sm font-semibold text-navy-900">Choisir un calcul</h3></div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="mb-2"><h3 className="text-xs font-semibold text-navy-900 sm:text-sm">Choisir un calcul</h3></div>
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     {TOOLS.map(item => {
                       const Icon = item.icon
-                      return <button key={item.id} type="button" onClick={() => selectTool(item.id)} className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-left transition-all hover:border-gold-400 hover:bg-gold-400/5" title={item.description}><span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-navy-900"><Icon className="h-3.5 w-3.5 text-gold-400" /></span><span className="text-xs font-semibold leading-tight text-navy-900">{item.label}</span></button>
+                      return <button key={item.id} type="button" onClick={() => selectTool(item.id)} className="flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-left transition-all hover:border-gold-400 hover:bg-gold-400/5 sm:min-h-11 sm:gap-2 sm:px-2.5 sm:py-2" title={item.description}><span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-navy-900 sm:h-7 sm:w-7 sm:rounded-lg"><Icon className="h-3 w-3 text-gold-400 sm:h-3.5 sm:w-3.5" /></span><span className="text-[11px] font-semibold leading-tight text-navy-900 sm:text-xs">{item.label}</span></button>
                     })}
                   </div>
                 </div>

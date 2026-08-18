@@ -64,7 +64,7 @@ if (
         <TopBar user={normalizedProfile} />
 
         <main className="flex-1 min-h-0 overflow-y-auto"> 
-          <div className="p-6 animate-fade-up">
+          <div className="p-3 sm:p-6 animate-fade-up">
           <CrmContextNavigation />
           {children}</div> 
         </main>

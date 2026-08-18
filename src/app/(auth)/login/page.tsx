@@ -94,23 +94,23 @@ export default async function LoginPage({
       </div>
 
       {/* ── Panneau droit — formulaire ────────────────── */}
-      <div className="flex-1 flex items-start justify-center px-5 py-8 sm:items-center sm:p-8">
+      <div className="flex-1 flex items-start justify-center px-5 py-5 sm:items-center sm:p-8">
         <div className="w-full max-w-sm">
 
-          <div className="flex flex-col items-center mb-6 text-center sm:mb-8">
+          <div className="flex flex-col items-center mb-4 text-center sm:mb-8">
   <Image
     src="/images/logo-ime.png"
     alt="IM ÉNERGIE"
     width={240}
     height={80}
-    className="h-14 w-auto object-contain mb-3 sm:h-20 sm:mb-5"
+    className="h-11 w-auto object-contain mb-2 sm:h-20 sm:mb-5"
   />
 
-  <h1 className="text-xl font-semibold text-white tracking-wide sm:text-2xl">
+  <h1 className="text-lg font-semibold text-white tracking-wide sm:text-2xl">
     IM ÉNERGIE CRM
   </h1>
 
-  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-gold-400/80 sm:text-xs sm:tracking-[0.22em]">
+  <p className="mt-1 text-[9px] uppercase tracking-[0.16em] text-gold-400/80 sm:text-xs sm:tracking-[0.22em]">
     Business Management System
   </p>
 </div>

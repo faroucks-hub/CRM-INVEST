@@ -62,7 +62,7 @@ window.location.href = '/dashboard'
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate>
 
       {/* Email */}
       <div>
@@ -77,7 +77,7 @@ window.location.href = '/dashboard'
           autoComplete="email"
           disabled={loading}
           className={cn(
-            'w-full px-3.5 py-2.5 bg-white/5 border rounded-md text-base sm:text-sm text-white',
+            'w-full px-3.5 py-2 bg-white/5 border rounded-md text-base sm:py-2.5 sm:text-sm text-white',
             'placeholder-white/30 outline-none transition-all duration-150',
             'focus:ring-2 focus:ring-gold-400/30 focus:border-gold-400',
             'disabled:opacity-50',
@@ -100,7 +100,7 @@ window.location.href = '/dashboard'
             autoComplete="current-password"
             disabled={loading}
             className={cn(
-              'w-full px-3.5 py-2.5 pr-10 bg-white/5 border rounded-md text-base sm:text-sm text-white',
+              'w-full px-3.5 py-2 pr-10 bg-white/5 border rounded-md text-base sm:py-2.5 sm:text-sm text-white',
               'placeholder-white/30 outline-none transition-all duration-150',
               'focus:ring-2 focus:ring-gold-400/30 focus:border-gold-400',
               'disabled:opacity-50',
@@ -134,7 +134,7 @@ window.location.href = '/dashboard'
         type="submit"
         disabled={loading}
         className={cn(
-          'w-full flex items-center justify-center gap-2 py-2.5 px-4',
+          'w-full flex items-center justify-center gap-2 py-2 px-4 sm:py-2.5',
           'bg-gold-400 hover:bg-gold-300 text-navy-900 font-medium text-sm',
           'rounded-md transition-all duration-150 active:scale-[0.99]',
           'disabled:opacity-60 disabled:cursor-not-allowed mt-2'
