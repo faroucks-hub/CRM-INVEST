@@ -30,7 +30,6 @@ const NAV_ITEMS: NavItem[] = [
   // ── Commercial
   { label: 'Website Leads', href: '/website-leads', icon: Globe, section: 'commercial',
     roles: ['admin', 'lead_team', 'commercial'] },
-  { href:'/catalogue-produits', label:'Produits du site', icon:PackageSearch, roles:['admin','lead_team'], section:'commercial' },
   { href:'/quotations',   label:'Quotations',           icon:FileText,        roles:['admin','lead_team','commercial'], section:'commercial' },
   { href:'/clients',      label:'Clients & Prospects', icon:Users,           roles:['admin','lead_team','commercial'], section:'commercial' },
   { href:'/opportunites', label:'Opportunités',         icon:TrendingUp,      roles:['admin','lead_team','commercial'], section:'commercial' },
@@ -50,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { href:'/achats',         label:'Achats & Commandes',  icon:ShoppingCart,    roles:['admin','lead_team'],              section:'partenaires' },
   { href:'/controle-affaires', label:'Contrôle d’affaires', icon:Scale, roles:['admin','lead_team'], section:'pilotage' },
   // ── Pilotage
+  { href:'/catalogue-produits', label:'Produits du site', icon:PackageSearch, roles:['admin','lead_team'], section:'pilotage' },
   { href:'/consolidation', label:'Consolidation affaires', icon:Activity, roles:['admin','lead_team','commercial'], section:'pilotage' },
   { href:'/rapports',     label:'Rapports & Performance', icon:BarChart3,     roles:['admin','lead_team','commercial'], section:'pilotage' },
   // ── Lydie AI

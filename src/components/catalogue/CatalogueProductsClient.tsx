@@ -168,7 +168,14 @@ export default function CatalogueProductsClient({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div className="card overflow-hidden">
+        <div className="hidden grid-cols-[minmax(150px,1.1fr)_minmax(180px,1.4fr)_140px_110px_110px] items-center gap-3 border-b bg-gray-50 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 md:grid">
+          <span>Produit</span>
+          <span>Badge affiché</span>
+          <span>Publication</span>
+          <span>État</span>
+          <span className="text-right">Action</span>
+        </div>
         {filtered.map(product => {
           const draft = drafts[product.id] ?? {
             status: normalizedStatus(product.status),
@@ -177,43 +184,38 @@ export default function CatalogueProductsClient({
           const dirty = isDirty(product)
           const saving = savingId === product.id
           return (
-            <article key={product.id} className={`card p-4 transition-colors ${dirty ? 'border-gold-400/60 bg-gold-50/30' : ''}`}>
-              <div className="flex items-start justify-between gap-3">
+            <article key={product.id} className={`border-b border-gray-100 p-4 transition-colors last:border-b-0 ${dirty ? 'bg-gold-50/30' : ''}`}>
+              <div className="grid gap-3 md:grid-cols-[minmax(150px,1.1fr)_minmax(180px,1.4fr)_140px_110px_110px] md:items-center">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold text-navy-900">{product.model}</h2>
                   <p className="mt-0.5 truncate text-xs text-gray-400">{product.slug || 'Slug non défini'}</p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_COLORS[draft.status]}`}>
-                  {CATALOGUE_PRODUCT_STATUS_LABELS[draft.status]}
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Badge affiché sur le site</span>
-                  <select className="input h-10 w-full text-sm" value={draft.status} onChange={event => updateDraft(product.id, { status: event.target.value as CatalogueProductStatus })}>
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400 md:hidden">Badge affiché</span>
+                  <select className="input h-9 w-full text-xs" value={draft.status} onChange={event => updateDraft(product.id, { status: event.target.value as CatalogueProductStatus })}>
                     {CATALOGUE_PRODUCT_STATUSES.map(status => <option key={status} value={status}>{CATALOGUE_PRODUCT_STATUS_LABELS[status]}</option>)}
                   </select>
                 </label>
-
                 <button
                   type="button"
                   onClick={() => updateDraft(product.id, { isPublished: !draft.isPublished })}
                   aria-pressed={draft.isPublished}
-                  className={`flex h-10 min-w-36 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${draft.isPublished ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-200 bg-gray-50 text-gray-500'}`}
+                  className={`flex h-9 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${draft.isPublished ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-200 bg-gray-50 text-gray-500'}`}
                 >
                   {draft.isPublished ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                   {draft.isPublished ? 'Publié' : 'Masqué'}
                 </button>
-              </div>
-
-              <div className="mt-3 flex min-h-8 items-center justify-between border-t border-gray-100 pt-3">
-                <span className="text-[10px] text-gray-400">
-                  {dirty ? 'Modification non enregistrée' : <span className="inline-flex items-center gap-1"><Check className="h-3 w-3" /> À jour</span>}
+                <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_COLORS[draft.status]}`}>
+                  {CATALOGUE_PRODUCT_STATUS_LABELS[draft.status]}
                 </span>
-                <button type="button" disabled={!dirty || saving} onClick={() => save(product)} className="btn btn-primary btn-sm disabled:cursor-not-allowed disabled:opacity-40">
-                  <Save className="h-3.5 w-3.5" />{saving ? 'Enregistrement…' : 'Enregistrer'}
-                </button>
+                <div className="flex items-center justify-between gap-2 md:justify-end">
+                  <span className="text-[10px] text-gray-400 md:hidden">
+                  {dirty ? 'Modification non enregistrée' : <span className="inline-flex items-center gap-1"><Check className="h-3 w-3" /> À jour</span>}
+                  </span>
+                  <button type="button" disabled={!dirty || saving} onClick={() => save(product)} className="btn btn-primary btn-sm h-9 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Enregistrer ${product.model}`}>
+                    <Save className="h-3.5 w-3.5" /><span className="md:hidden xl:inline">{saving ? 'Enregistrement…' : 'Enregistrer'}</span>
+                  </button>
+                </div>
               </div>
             </article>
           )
