@@ -33,3 +33,21 @@ test('le menu masque le controle d affaires au commercial', () => {
   const sidebar = read('src/components/layout/Sidebar.tsx')
   assert.match(sidebar, /href:'\/controle-affaires'[\s\S]*?roles:\['admin','lead_team'\]/)
 })
+
+test('la gestion des produits du site est reservee aux administrateurs et leads', () => {
+  const permissions = read('src/lib/auth/permissions.ts')
+  const sidebar = read('src/components/layout/Sidebar.tsx')
+  assert.match(permissions, /'\/catalogue-produits': \['admin', 'lead_team'\]/)
+  assert.doesNotMatch(permissions, /'\/catalogue-produits': \[[^\]]*'commercial'/)
+  assert.match(sidebar, /href:'\/catalogue-produits'[\s\S]*?roles:\['admin','lead_team'\]/)
+})
+
+test('les statuts publics du catalogue sont limites a la liste validee', () => {
+  const statuses = read('src/lib/catalogue-products.ts')
+  const action = read('src/lib/actions/catalogue-products.ts')
+  for (const status of ['active', 'new', 'updated', 'hot', 'custom', 'on_request', 'legacy', 'discontinued']) {
+    assert.match(statuses, new RegExp(`'${status}'`))
+  }
+  assert.match(action, /if \(!ctx\.isPrivileged\) return roleDenied\(\)/)
+  assert.match(action, /isCatalogueProductStatus\(input\.status\)/)
+})
