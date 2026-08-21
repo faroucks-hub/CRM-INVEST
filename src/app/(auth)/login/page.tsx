@@ -21,8 +21,8 @@ export default async function LoginPage({
     <div className="min-h-screen min-h-dvh bg-navy-900 flex">
 
       {/* ── Panneau gauche — branding ─────────────────── */}
-      <div className="hidden lg:flex lg:w-[45%] flex-col justify-between
-                      p-12 bg-navy-950 border-r border-white/5 relative overflow-hidden">
+      <div className="hidden md:flex md:w-[45%] flex-col justify-between
+                      p-7 xl:p-12 bg-navy-950 border-r border-white/5 relative overflow-hidden">
 
         {/* Motif géométrique subtil */}
         <div className="absolute inset-0 opacity-[0.03]"
@@ -51,7 +51,7 @@ export default async function LoginPage({
             </div>
           </div>
 
-          <h1 className="font-serif text-4xl font-semibold text-white leading-tight mb-4">
+          <h1 className="font-serif text-3xl xl:text-4xl font-semibold text-white leading-tight mb-4">
             Pilotez vos projets<br />
             <span className="text-gold-400">énergétiques</span>
           </h1>
