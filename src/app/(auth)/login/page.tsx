@@ -21,7 +21,7 @@ export default async function LoginPage({
     <div className="min-h-screen min-h-dvh bg-navy-900 flex">
 
       {/* ── Panneau gauche — branding ─────────────────── */}
-      <div className="hidden md:flex md:w-[45%] flex-col justify-between
+      <div className="login-brand-panel flex-col justify-between
                       p-7 xl:p-12 bg-navy-950 border-r border-white/5 relative overflow-hidden">
 
         {/* Motif géométrique subtil */}

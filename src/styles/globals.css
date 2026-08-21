@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Connexion : règle explicite, indépendante des variantes responsive Tailwind. */
+.login-brand-panel {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .login-brand-panel {
+    display: flex;
+    width: 45%;
+  }
+}
+
 /* ── IME Design Tokens ───────────────────────────────────────────── */
 :root {
   --navy:   #0B1F3A;
