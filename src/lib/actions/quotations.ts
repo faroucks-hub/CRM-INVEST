@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { QuotationLine } from '@/types/sprint3'
-import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+import { getActionContext as getBaseActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+
+const getActionContext = () => getBaseActionContext('quotations')
 
 export interface QuotationPayload {
   client_id: string

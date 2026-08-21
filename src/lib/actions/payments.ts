@@ -1,6 +1,8 @@
 'use server'
 import { revalidatePath } from 'next/cache'
-import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+import { getActionContext as getBaseActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+
+const getActionContext = () => getBaseActionContext('payments')
 
 export interface PaymentPayload {
   client_id:string; project_id?:string; proforma_id?:string; assigned_to?:string;

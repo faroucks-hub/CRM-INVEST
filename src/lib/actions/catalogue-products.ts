@@ -14,7 +14,7 @@ type UpdateCatalogueProductInput = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function updateCatalogueProductAction(input: UpdateCatalogueProductInput) {
-  const ctx = await getActionContext()
+  const ctx = await getActionContext('catalogue_products')
   if (!ctx.ok) return { error: ctx.error }
   if (!ctx.isPrivileged) return roleDenied()
   if (!UUID_RE.test(input.id)) return { error: 'Identifiant produit invalide' }

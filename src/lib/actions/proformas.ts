@@ -2,7 +2,9 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ProformaLine } from '@/types/sprint3'
-import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+import { getActionContext as getBaseActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+
+const getActionContext = () => getBaseActionContext('proformas')
 
 export interface ProformaPayload {
   client_id:string; quotation_id?:string; opportunity_id?:string; assigned_to?:string;

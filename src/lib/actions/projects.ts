@@ -2,7 +2,9 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { WORKFLOW_STEPS } from '@/types/sprint4'
-import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+import { getActionContext as getBaseActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+
+const getActionContext = () => getBaseActionContext('projects')
 
 export interface ProjectPayload {
   name:string; client_id:string; assigned_to?:string;

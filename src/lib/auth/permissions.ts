@@ -1,3 +1,5 @@
+import type { ModuleKey } from '@/lib/auth/module-access'
+
 export type UserRole = 'admin' | 'lead_team' | 'commercial'
 
 export const permissions = {
@@ -78,7 +80,27 @@ export const routePermissions: Record<string, UserRole[]> = {
   '/lydie': ['admin', 'lead_team', 'commercial'],
 }
 
-export function canAccessRoute(pathname: string, role: UserRole) {
+export const routeModules: Record<string, ModuleKey> = {
+  '/website-leads': 'website_leads',
+  '/catalogue-produits': 'catalogue_products',
+  '/quotations': 'quotations',
+  '/clients': 'clients',
+  '/opportunites': 'opportunities',
+  '/proformas': 'proformas',
+  '/projets': 'projects',
+  '/paiements': 'payments',
+  '/documents': 'documents',
+  '/partenaires': 'partners',
+  '/achats': 'purchases',
+  '/controle-affaires': 'deal_control',
+  '/consolidation': 'consolidation',
+  '/rapports': 'reports',
+  '/taches': 'tasks',
+  '/calculateurs': 'calculators',
+  '/lydie': 'lydie',
+}
+
+export function canAccessRoute(pathname: string, role: UserRole, allowedModules?: readonly string[]) {
   const entry = Object.entries(routePermissions)
     .sort(([a], [b]) => b.length - a.length)
     .find(([route]) => pathname === route || pathname.startsWith(`${route}/`))
@@ -87,5 +109,12 @@ export function canAccessRoute(pathname: string, role: UserRole) {
   // explicitly assigned to one or more roles before it becomes reachable.
   if (!entry) return false
 
-  return entry[1].includes(role)
+  if (!entry[1].includes(role)) return false
+  if (role === 'admin' || !allowedModules) return true
+
+  const moduleEntry = Object.entries(routeModules)
+    .sort(([a], [b]) => b.length - a.length)
+    .find(([route]) => pathname === route || pathname.startsWith(`${route}/`))
+
+  return !moduleEntry || allowedModules.includes(moduleEntry[1])
 }

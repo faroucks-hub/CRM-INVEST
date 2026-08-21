@@ -9,6 +9,7 @@ import { canAccessRoute } from '@/lib/auth/permissions'
 import { headers } from 'next/headers'
 import CrmContextNavigation from "@/components/crm/CrmContextNavigation";
 import GlobalCalculator from '@/components/calculateurs/GlobalCalculator'
+import { defaultAllowedModules } from '@/lib/auth/module-access'
 
 export default async function DashboardLayout({
   children,
@@ -44,13 +45,26 @@ const normalizedProfile = {
   role: data.role as UserRole,
 }
 
+let allowedModules = defaultAllowedModules(normalizedProfile.role)
+if (normalizedProfile.role !== 'admin') {
+  const { data: configuredPermissions } = await supabase
+    .from('role_module_permissions')
+    .select('module_key, enabled')
+    .eq('role', normalizedProfile.role)
+  if (configuredPermissions) {
+    const configured = new Map(configuredPermissions.map(item => [item.module_key, item.enabled]))
+    allowedModules = allowedModules.filter(moduleKey => configured.get(moduleKey) !== false)
+  }
+}
+
 const requestHeaders = await headers()
 const pathname = requestHeaders.get('x-pathname') ?? '/dashboard'
 
 if (
   !canAccessRoute(
     pathname,
-    normalizedProfile.role
+    normalizedProfile.role,
+    allowedModules
   )
 ) {
   redirect('/dashboard')
@@ -58,10 +72,10 @@ if (
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-100">
-      <Sidebar role={normalizedProfile.role} />
+      <Sidebar role={normalizedProfile.role} allowedModules={allowedModules} />
 
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
-        <TopBar user={normalizedProfile} />
+        <TopBar user={normalizedProfile} allowedModules={allowedModules} />
 
         <main className="flex-1 min-h-0 overflow-y-auto"> 
           <div className="p-3 sm:p-6 animate-fade-up">
@@ -70,14 +84,14 @@ if (
         </main>
       </div>
 
-      <LydieChat
+      {(normalizedProfile.role === 'admin' || allowedModules.includes('lydie')) && <LydieChat
         user={{
           id: normalizedProfile.id,
           full_name: normalizedProfile.full_name,
           role: normalizedProfile.role,
         }}
-      />
-      <GlobalCalculator />
+      />}
+      {(normalizedProfile.role === 'admin' || allowedModules.includes('calculators')) && <GlobalCalculator />}
     </div>
   )
 }

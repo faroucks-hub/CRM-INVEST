@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getActionContext } from '@/lib/auth/action-context'
 
 export type WebsiteLeadStatus =
   | 'new'
@@ -32,6 +33,8 @@ export async function updateWebsiteLeadStatusAction(
   leadId: string,
   status: string
 ) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -55,6 +58,8 @@ export async function updateWebsiteLeadNotesAction(
   leadId: string,
   internalNotes: string
 ) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -75,6 +80,8 @@ export async function updateWebsiteLeadNotesAction(
 }
 
 export async function convertWebsiteLeadToOpportunityAction(leadId: string) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
 
   const {
@@ -206,6 +213,8 @@ export async function convertWebsiteLeadToOpportunityAction(leadId: string) {
 }
 
 export async function softDeleteLead(leadId: string, reason?: string) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -227,6 +236,8 @@ export async function softDeleteLead(leadId: string, reason?: string) {
 }
 
 export async function restoreLead(leadId: string) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -247,6 +258,8 @@ export async function restoreLead(leadId: string) {
 }
 
 export async function hardDeleteLead(leadId: string) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }

@@ -2,11 +2,18 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Users, Building2, Settings2, ClipboardList, Shield, ScrollText } from 'lucide-react'
+import { Users, Building2, Settings2, ClipboardList, Shield, ScrollText, LockKeyhole } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Paramètres' }
 
 const SETTINGS_SECTIONS = [
+  {
+    href:'/parametres/acces',
+    icon:LockKeyhole, title:'Accès et permissions',
+    desc:'Définir les modules accessibles aux Leads et aux Commerciaux.',
+    color:'bg-green-50 text-green-700',
+    adminOnly:true,
+  },
   {
     href:'/parametres/utilisateurs',
     icon:Users, title:'Utilisateurs',

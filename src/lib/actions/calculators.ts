@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { CalcType } from '@/types/sprint5'
+import { getActionContext } from '@/lib/auth/action-context'
 
 export interface SaveCalcPayload {
   calc_type:     CalcType
@@ -14,6 +15,8 @@ export interface SaveCalcPayload {
 }
 
 export async function saveCalculationAction(data: SaveCalcPayload) {
+  const access = await getActionContext('calculators')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -39,6 +42,8 @@ export async function saveCalculationAction(data: SaveCalcPayload) {
 }
 
 export async function deleteCalculationAction(id: string) {
+  const access = await getActionContext('calculators')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { error } = await supabase.from('calc_history').delete().eq('id', id)
   if (error) return { error: error.message }
@@ -47,6 +52,8 @@ export async function deleteCalculationAction(id: string) {
 }
 
 export async function getCalcHistory() {
+  const access = await getActionContext('calculators')
+  if (!access.ok) return { data: [], error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [] }

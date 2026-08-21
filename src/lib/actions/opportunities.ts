@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { getActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+import { getActionContext as getBaseActionContext, roleDenied, type ActionResult } from '@/lib/auth/action-context'
+
+const getActionContext = () => getBaseActionContext('opportunities')
 
 const oppSchema = z.object({
   name:             z.string().min(1, 'Nom requis'),

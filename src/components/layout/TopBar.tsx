@@ -10,9 +10,9 @@ import type { UserProfile } from '@/types'
 import { ROLE_LABELS } from '@/types'
 import NotificationBell from '@/components/notifications/NotificationBell'
 
-interface TopBarProps { user: UserProfile }
+interface TopBarProps { user: UserProfile; allowedModules?: readonly string[] }
 
-export default function TopBar({ user }: TopBarProps) {
+export default function TopBar({ user, allowedModules }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const router = useRouter()
 
@@ -42,16 +42,16 @@ export default function TopBar({ user }: TopBarProps) {
       {/* Right */}
       <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-2">
 
-        <Link
+        {(user.role === 'admin' || !allowedModules || allowedModules.includes('tasks')) && <Link
           href="/taches"
           className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-50 hover:text-navy-900"
           aria-label="Ouvrir les tâches"
           title="Tâches"
         >
           <CheckSquare className="h-5 w-5" />
-        </Link>
+        </Link>}
 
-        <button
+        {(user.role === 'admin' || !allowedModules || allowedModules.includes('calculators')) && <button
           type="button"
           onClick={() => window.dispatchEvent(new Event('open-global-calculator'))}
           className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gold-400/10 hover:text-gold-700"
@@ -59,7 +59,7 @@ export default function TopBar({ user }: TopBarProps) {
           title="Centre de calcul (Ctrl/⌘ + Maj + C)"
         >
           <Calculator className="h-5 w-5" />
-        </button>
+        </button>}
 
         {/* Notification Bell — real-time */}
         <NotificationBell userId={user.id} />

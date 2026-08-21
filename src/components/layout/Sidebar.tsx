@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types'
+import type { ModuleKey } from '@/lib/auth/module-access'
 import {
   Globe
 } from 'lucide-react'
@@ -22,38 +23,39 @@ interface NavItem {
   roles:   UserRole[]
   badge?:  string
   section: string
+  moduleKey?: ModuleKey
 }
 
 const NAV_ITEMS: NavItem[] = [
   // ── Principal
   { href:'/dashboard',    label:'Dashboard',          icon:LayoutDashboard, roles:['admin','lead_team','commercial'], section:'accueil' },
   // ── Commercial
-  { label: 'Website Leads', href: '/website-leads', icon: Globe, section: 'commercial',
+  { label: 'Website Leads', href: '/website-leads', icon: Globe, section: 'commercial', moduleKey:'website_leads',
     roles: ['admin', 'lead_team', 'commercial'] },
-  { href:'/quotations',   label:'Quotations',           icon:FileText,        roles:['admin','lead_team','commercial'], section:'commercial' },
-  { href:'/clients',      label:'Clients & Prospects', icon:Users,           roles:['admin','lead_team','commercial'], section:'commercial' },
-  { href:'/opportunites', label:'Opportunités',         icon:TrendingUp,      roles:['admin','lead_team','commercial'], section:'commercial' },
+  { href:'/quotations',   label:'Quotations', icon:FileText, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'quotations' },
+  { href:'/clients', label:'Clients & Prospects', icon:Users, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'clients' },
+  { href:'/opportunites', label:'Opportunités', icon:TrendingUp, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'opportunities' },
   { label: 'Corbeille Leads',
     href: '/website-leads/trash',
     icon: ClipboardList,
     section: 'commercial',
-    roles: ['admin', 'lead_team']
+    roles: ['admin', 'lead_team'], moduleKey:'website_leads'
   },
   // ── Opérations
-  { href:'/proformas',    label:'Proformas',            icon:Receipt,         roles:['admin','lead_team'],              section:'operations' },
-  { href:'/projets',      label:'Projets',              icon:FolderKanban,    roles:['admin','lead_team','commercial'], section:'operations' },
-  { href:'/paiements',    label:'Paiements',            icon:CreditCard,      roles:['admin','lead_team','commercial'], section:'operations' },
-  { href:'/documents',    label:'Documents',            icon:Zap,             roles:['admin','lead_team','commercial'], section:'operations' },
+  { href:'/proformas', label:'Proformas', icon:Receipt, roles:['admin','lead_team'], section:'operations', moduleKey:'proformas' },
+  { href:'/projets', label:'Projets', icon:FolderKanban, roles:['admin','lead_team','commercial'], section:'operations', moduleKey:'projects' },
+  { href:'/paiements', label:'Paiements', icon:CreditCard, roles:['admin','lead_team','commercial'], section:'operations', moduleKey:'payments' },
+  { href:'/documents', label:'Documents', icon:Zap, roles:['admin','lead_team','commercial'], section:'operations', moduleKey:'documents' },
   // ── Partenaires
-  { href:'/partenaires',   label:'Partenaires',         icon:Building2,       roles:['admin','lead_team'],              section:'partenaires' },
-  { href:'/achats',         label:'Achats & Commandes',  icon:ShoppingCart,    roles:['admin','lead_team'],              section:'partenaires' },
-  { href:'/controle-affaires', label:'Contrôle d’affaires', icon:Scale, roles:['admin','lead_team'], section:'pilotage' },
+  { href:'/partenaires', label:'Partenaires', icon:Building2, roles:['admin','lead_team'], section:'partenaires', moduleKey:'partners' },
+  { href:'/achats', label:'Achats & Commandes', icon:ShoppingCart, roles:['admin','lead_team'], section:'partenaires', moduleKey:'purchases' },
+  { href:'/controle-affaires', label:'Contrôle d’affaires', icon:Scale, roles:['admin','lead_team'], section:'pilotage', moduleKey:'deal_control' },
   // ── Pilotage
-  { href:'/catalogue-produits', label:'Produits du site', icon:PackageSearch, roles:['admin','lead_team'], section:'pilotage' },
-  { href:'/consolidation', label:'Consolidation affaires', icon:Activity, roles:['admin','lead_team','commercial'], section:'pilotage' },
-  { href:'/rapports',     label:'Rapports & Performance', icon:BarChart3,     roles:['admin','lead_team','commercial'], section:'pilotage' },
+  { href:'/catalogue-produits', label:'Produits du site', icon:PackageSearch, roles:['admin','lead_team'], section:'pilotage', moduleKey:'catalogue_products' },
+  { href:'/consolidation', label:'Consolidation affaires', icon:Activity, roles:['admin','lead_team','commercial'], section:'pilotage', moduleKey:'consolidation' },
+  { href:'/rapports', label:'Rapports & Performance', icon:BarChart3, roles:['admin','lead_team','commercial'], section:'pilotage', moduleKey:'reports' },
   // ── Lydie AI
-  { href:'/lydie',        label:'Lydie AI',             icon:Sparkles,        roles:['admin','lead_team','commercial'], section:'outils' },
+  { href:'/lydie', label:'Lydie AI', icon:Sparkles, roles:['admin','lead_team','commercial'], section:'outils', moduleKey:'lydie' },
   { href:'/aide',         label:"Guide d'utilisation", icon:HelpCircle,      roles:['admin','lead_team','commercial'], section:'assistance' },
   // ── Admin
   { href:'/parametres',        label:'Paramètres',              icon:Settings,       roles:['admin'], section:'admin' },
@@ -72,13 +74,16 @@ const SECTION_LABELS: Record<string, string> = {
   admin:       'Administration',
 }
 
-interface SidebarProps { role: UserRole }
+interface SidebarProps { role: UserRole; allowedModules?: readonly string[] }
 
-export default function Sidebar({ role }: SidebarProps) {
+export default function Sidebar({ role, allowedModules }: SidebarProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const visible = NAV_ITEMS.filter(item => !item.roles || item.roles.includes(role))
+  const visible = NAV_ITEMS.filter(item =>
+    (!item.roles || item.roles.includes(role)) &&
+    (role === 'admin' || !item.moduleKey || !allowedModules || allowedModules.includes(item.moduleKey))
+  )
 
   const sections = visible.reduce<Record<string, NavItem[]>>((acc, item) => {
     if (!acc[item.section]) acc[item.section] = []

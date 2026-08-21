@@ -51,3 +51,33 @@ test('les statuts publics du catalogue sont limites a la liste validee', () => {
   assert.match(action, /if \(!ctx\.isPrivileged\) return roleDenied\(\)/)
   assert.match(action, /isCatalogueProductStatus\(input\.status\)/)
 })
+
+test('les permissions configurables restent plafonnees par les roles de securite', () => {
+  const modules = read('src/lib/auth/module-access.ts')
+  const action = read('src/lib/actions/access-settings.ts')
+  assert.match(modules, /key:'catalogue_products'[\s\S]*?baselineRoles:\['admin','lead_team'\]/)
+  assert.match(modules, /key:'deal_control'[\s\S]*?baselineRoles:\['admin','lead_team'\]/)
+  assert.match(action, /enabled && !baselineAllows\(role, key\)/)
+  assert.match(action, /actor\?\.role !== 'admin'/)
+})
+
+test('le layout applique les permissions aux routes et au menu', () => {
+  const layout = read('src/app/(dashboard)/layout.tsx')
+  const permissions = read('src/lib/auth/permissions.ts')
+  const sidebar = read('src/components/layout/Sidebar.tsx')
+  assert.match(layout, /role_module_permissions/)
+  assert.match(layout, /canAccessRoute\([\s\S]*allowedModules/)
+  assert.match(permissions, /allowedModules\.includes\(moduleEntry\[1\]\)/)
+  assert.match(sidebar, /allowedModules\.includes\(item\.moduleKey\)/)
+})
+
+test('les actions principales verifient les modules desactives', () => {
+  const expected = {
+    clients: 'clients', opportunities: 'opportunities', quotations: 'quotations',
+    proformas: 'proformas', projects: 'projects', payments: 'payments',
+  }
+  for (const [file, moduleKey] of Object.entries(expected)) {
+    assert.match(read(`src/lib/actions/${file}.ts`), new RegExp(`getBaseActionContext\\('${moduleKey}'\\)`), file)
+  }
+  assert.match(read('src/lib/actions/catalogue-products.ts'), /getActionContext\('catalogue_products'\)/)
+})

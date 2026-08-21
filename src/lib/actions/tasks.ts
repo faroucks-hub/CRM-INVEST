@@ -1,6 +1,7 @@
 'use server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getActionContext } from '@/lib/auth/action-context'
 
 export type TaskPriority = 'faible' | 'normale' | 'haute' | 'urgente'
 export type TaskStatus   = 'a_faire' | 'en_cours' | 'termine' | 'en_retard'
@@ -20,6 +21,8 @@ export interface TaskPayload {
 }
 
 export async function createTaskAction(data: TaskPayload) {
+  const access = await getActionContext('tasks')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -47,6 +50,8 @@ export async function createTaskAction(data: TaskPayload) {
 }
 
 export async function updateTaskAction(id: string, data: Partial<TaskPayload> & { completed_at?: string }) {
+  const access = await getActionContext('tasks')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
@@ -68,6 +73,8 @@ export async function updateTaskAction(id: string, data: Partial<TaskPayload> & 
 }
 
 export async function deleteTaskAction(id: string) {
+  const access = await getActionContext('tasks')
+  if (!access.ok) return { error: access.error }
   const supabase = await createClient()
   const { error } = await supabase.from('taches').delete().eq('id', id)
   if (error) return { error: error.message }
