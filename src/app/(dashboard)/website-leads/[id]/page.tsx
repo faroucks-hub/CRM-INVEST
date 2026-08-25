@@ -119,6 +119,7 @@ export default async function WebsiteLeadDetailPage({
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-3">
+              {lead.email && <Link href={`/messagerie?to=${encodeURIComponent(lead.email)}&leadId=${lead.id}`} className="btn btn-primary"><Mail className="h-4 w-4" />Répondre par e-mail</Link>}
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Source</p>
                 <p className="mt-1 text-sm font-semibold capitalize text-navy-900">{lead.source || 'website'}</p>

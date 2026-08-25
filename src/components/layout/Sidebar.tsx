@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, Building2, TrendingUp, FolderKanban,
   CreditCard, FileText, Receipt, Settings, Zap,
-  Sparkles, HelpCircle, ClipboardList, BarChart3, ShoppingCart, Scale, Activity, ChevronDown, X, PackageSearch,
+  Sparkles, HelpCircle, ClipboardList, BarChart3, ShoppingCart, Scale, Activity, ChevronDown, X, PackageSearch, Mail,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   // ── Commercial
   { label: 'Website Leads', href: '/website-leads', icon: Globe, section: 'commercial', moduleKey:'website_leads',
     roles: ['admin', 'lead_team', 'commercial'] },
+  { href:'/messagerie', label:'Messagerie', icon:Mail, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'messaging' },
   { href:'/quotations',   label:'Quotations', icon:FileText, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'quotations' },
   { href:'/clients', label:'Clients & Prospects', icon:Users, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'clients' },
   { href:'/opportunites', label:'Opportunités', icon:TrendingUp, roles:['admin','lead_team','commercial'], section:'commercial', moduleKey:'opportunities' },

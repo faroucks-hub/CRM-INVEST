@@ -4,7 +4,7 @@ export const MODULE_KEYS = [
   'website_leads', 'quotations', 'clients', 'opportunities', 'proformas',
   'projects', 'payments', 'documents', 'partners', 'purchases',
   'deal_control', 'catalogue_products', 'consolidation', 'reports',
-  'tasks', 'calculators', 'lydie',
+  'tasks', 'calculators', 'lydie', 'messaging',
 ] as const
 
 export type ModuleKey = typeof MODULE_KEYS[number]
@@ -21,6 +21,7 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   { key:'quotations', label:'Quotations', section:'Développement commercial', baselineRoles:['admin','lead_team','commercial'] },
   { key:'clients', label:'Clients & Prospects', section:'Développement commercial', baselineRoles:['admin','lead_team','commercial'] },
   { key:'opportunities', label:'Opportunités', section:'Développement commercial', baselineRoles:['admin','lead_team','commercial'] },
+  { key:'messaging', label:'Messagerie', section:'Développement commercial', baselineRoles:['admin','lead_team','commercial'] },
   { key:'proformas', label:'Proformas', section:'Exécution', baselineRoles:['admin','lead_team'] },
   { key:'projects', label:'Projets', section:'Exécution', baselineRoles:['admin','lead_team','commercial'] },
   { key:'payments', label:'Paiements', section:'Exécution', baselineRoles:['admin','lead_team','commercial'] },

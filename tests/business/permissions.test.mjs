@@ -81,3 +81,23 @@ test('les actions principales verifient les modules desactives', () => {
   }
   assert.match(read('src/lib/actions/catalogue-products.ts'), /getActionContext\('catalogue_products'\)/)
 })
+
+test('la messagerie est individuelle et disponible aux trois roles', () => {
+  const permissions = read('src/lib/auth/permissions.ts')
+  const modules = read('src/lib/auth/module-access.ts')
+  const migration = read('supabase/migrations/033_gmail_individual_mailboxes.sql')
+  assert.match(permissions, /'\/messagerie': \['admin', 'lead_team', 'commercial'\]/)
+  assert.match(modules, /key:'messaging'[\s\S]*?baselineRoles:\['admin','lead_team','commercial'\]/)
+  assert.match(migration, /user_id = auth\.uid\(\)/)
+  assert.doesNotMatch(migration, /mail\.google\.com/)
+})
+
+test('les jetons Gmail sont chiffres et les messages restent chez Google', () => {
+  const crypto = read('src/lib/email/crypto.ts')
+  const gmail = read('src/lib/email/gmail.ts')
+  const migration = read('supabase/migrations/033_gmail_individual_mailboxes.sql')
+  assert.match(crypto, /aes-256-gcm/)
+  assert.match(gmail, /gmail\.modify/)
+  assert.match(migration, /access_token_encrypted/)
+  assert.doesNotMatch(migration, /\bbody\b/)
+})

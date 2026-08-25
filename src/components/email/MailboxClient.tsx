@@ -1,0 +1,33 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Inbox, Mail, PenLine, RefreshCw, Send, Unplug, X } from 'lucide-react'
+import { toast } from 'sonner'
+
+type Summary = { id:string; threadId:string; from:string; subject:string; date:string; snippet:string; unread:boolean }
+type Detail = { id:string; threadId:string; from:string; to:string; subject:string; date:string; messageId:string; references:string; body:string }
+
+export default function MailboxClient({ connected, email, initialTo = '', initialLeadId = '' }: { connected:boolean; email?:string; initialTo?:string; initialLeadId?:string }) {
+  const [messages, setMessages] = useState<Summary[]>([]), [selected, setSelected] = useState<Detail|null>(null)
+  const [loading, setLoading] = useState(false), [compose, setCompose] = useState(Boolean(initialTo))
+  const [to, setTo] = useState(initialTo), [subject, setSubject] = useState(''), [body, setBody] = useState('')
+  const [attachments, setAttachments] = useState<Array<{name:string;type:string;data:string}>>([])
+
+  async function load() { setLoading(true); const r=await fetch('/api/email/messages'); const j=await r.json(); setLoading(false); if(!r.ok) toast.error(j.error); else setMessages(j.messages) }
+  useEffect(() => { if(connected) void load() }, [connected])
+  async function open(id:string) { setLoading(true); const r=await fetch(`/api/email/messages?id=${encodeURIComponent(id)}`); const j=await r.json(); setLoading(false); if(!r.ok) toast.error(j.error); else setSelected(j) }
+  function reply() { if(!selected)return; setTo(selected.from.match(/<([^>]+)>/)?.[1] ?? selected.from); setSubject(/^re:/i.test(selected.subject)?selected.subject:`Re: ${selected.subject}`); setBody(`\n\n--- Message précédent ---\n${selected.body}`); setCompose(true) }
+  async function send() { setLoading(true); const r=await fetch('/api/email/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({to,subject,body,attachments,threadId:selected?.threadId,inReplyTo:selected?.messageId,references:selected?.references,leadId:initialLeadId||undefined})}); const j=await r.json(); setLoading(false); if(!r.ok)return toast.error(j.error); toast.success('E-mail envoyé'); setCompose(false); setBody(''); setAttachments([]); void load() }
+  async function chooseFiles(files:FileList|null){ if(!files)return; const selected=[...files].slice(0,5); if(selected.reduce((n,f)=>n+f.size,0)>10_000_000)return toast.error('Maximum 10 Mo'); const encoded=await Promise.all(selected.map(file=>new Promise<{name:string;type:string;data:string}>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type,data:String(reader.result).split(',')[1]});reader.onerror=reject;reader.readAsDataURL(file)})));setAttachments(encoded) }
+  async function disconnect(){ if(!confirm('Déconnecter votre boîte Gmail du CRM ?'))return; await fetch('/api/email/messages',{method:'DELETE'}); location.reload() }
+
+  if(!connected) return <div className="mx-auto max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm"><Mail className="mx-auto h-10 w-10 text-gold-500"/><h2 className="mt-4 text-xl font-bold text-navy-950">Connecter ma boîte professionnelle</h2><p className="mt-2 text-sm leading-6 text-slate-500">Chaque utilisateur connecte sa propre boîte Google Workspace. Le CRM ne stocke jamais votre mot de passe.</p><a href="/api/email/google/connect" className="btn btn-primary mt-6">Connecter avec Google</a></div>
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="page-title">Messagerie</h1><p className="page-subtitle">{email}</p></div><div className="flex gap-2"><button className="btn btn-secondary" onClick={load}><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/>Actualiser</button><button className="btn btn-primary" onClick={()=>{setSelected(null);setCompose(true)}}><PenLine className="h-4 w-4"/>Nouveau</button><button className="btn btn-secondary" onClick={disconnect} title="Déconnecter"><Unplug className="h-4 w-4"/></button></div></div>
+    <div className="grid min-h-[620px] overflow-hidden rounded-2xl border bg-white shadow-sm lg:grid-cols-[380px_1fr]">
+      <div className="border-r"><div className="flex items-center gap-2 border-b p-4 font-semibold text-navy-900"><Inbox className="h-4 w-4"/>Boîte de réception</div>{messages.map(m=><button key={m.id} onClick={()=>open(m.id)} className={`w-full border-b p-4 text-left hover:bg-slate-50 ${selected?.id===m.id?'bg-gold-50':''}`}><div className={`truncate text-sm ${m.unread?'font-bold':'font-semibold'} text-navy-950`}>{m.from}</div><div className="mt-1 truncate text-sm text-slate-700">{m.subject}</div><div className="mt-1 line-clamp-2 text-xs text-slate-400">{m.snippet}</div></button>)}{!messages.length&&!loading&&<p className="p-6 text-sm text-slate-400">Aucun message.</p>}</div>
+      <div className="min-w-0 p-5 lg:p-7">{selected?<><h2 className="text-xl font-bold text-navy-950">{selected.subject}</h2><p className="mt-2 text-sm text-slate-500">De : {selected.from}</p><pre className="mt-6 whitespace-pre-wrap font-sans text-sm leading-7 text-slate-700">{selected.body}</pre><button className="btn btn-primary mt-6" onClick={reply}>Répondre</button></>:<div className="flex h-full items-center justify-center text-sm text-slate-400">Sélectionnez un message</div>}</div>
+    </div>
+    {compose&&<div className="fixed inset-0 z-[90] flex items-end justify-end bg-navy-950/30 p-3 sm:p-6"><div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-center justify-between"><h2 className="font-bold text-navy-950">Nouveau message</h2><button onClick={()=>setCompose(false)}><X/></button></div><div className="mt-4 space-y-3"><input className="input" placeholder="Destinataire" value={to} onChange={e=>setTo(e.target.value)}/><input className="input" placeholder="Objet" value={subject} onChange={e=>setSubject(e.target.value)}/><textarea className="input min-h-56" placeholder="Votre message" value={body} onChange={e=>setBody(e.target.value)}/><label className="block rounded-xl border border-dashed p-3 text-sm text-slate-500">Pièces jointes (5 fichiers, 10 Mo maximum)<input type="file" multiple className="mt-2 block w-full text-xs" onChange={e=>void chooseFiles(e.target.files)}/></label>{attachments.length>0&&<p className="text-xs text-slate-500">{attachments.map(file=>file.name).join(', ')}</p>}</div><button disabled={loading} onClick={send} className="btn btn-primary mt-4"><Send className="h-4 w-4"/>Envoyer</button></div></div>}
+  </div>
+}

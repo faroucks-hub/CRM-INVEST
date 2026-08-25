@@ -55,6 +55,7 @@ export function hasPermission(
 export const routePermissions: Record<string, UserRole[]> = {
   '/website-leads/trash': ['admin', 'lead_team'],
   '/website-leads': ['admin', 'lead_team', 'commercial'],
+  '/messagerie': ['admin', 'lead_team', 'commercial'],
   '/catalogue-produits': ['admin', 'lead_team'],
   '/rapports/saisie-financiere': ['admin', 'lead_team'],
   '/rapports': ['admin', 'lead_team', 'commercial'],
@@ -82,6 +83,7 @@ export const routePermissions: Record<string, UserRole[]> = {
 
 export const routeModules: Record<string, ModuleKey> = {
   '/website-leads': 'website_leads',
+  '/messagerie': 'messaging',
   '/catalogue-produits': 'catalogue_products',
   '/quotations': 'quotations',
   '/clients': 'clients',
