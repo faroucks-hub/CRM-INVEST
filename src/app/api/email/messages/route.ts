@@ -12,15 +12,37 @@ export async function GET(request: NextRequest) {
       const headers = message.payload?.headers ?? []
       return NextResponse.json({ id: message.id, threadId: message.threadId, from: header(headers, 'From'), to: header(headers, 'To'), subject: header(headers, 'Subject'), date: header(headers, 'Date'), messageId: header(headers, 'Message-ID'), references: header(headers, 'References'), body: extractBody(message.payload), labels: message.labelIds ?? [] })
     }
-    const query = request.nextUrl.searchParams.get('q') || 'in:inbox'
-    const list = await (await gmailFetch(`/messages?maxResults=30&q=${encodeURIComponent(query)}`)).json()
+    const folder = request.nextUrl.searchParams.get('folder') || 'inbox'
+    const search = request.nextUrl.searchParams.get('q')?.trim() || ''
+    const pageToken = request.nextUrl.searchParams.get('pageToken') || ''
+    const folderQueries: Record<string,string> = { inbox:'in:inbox', sent:'in:sent', drafts:'in:drafts', trash:'in:trash', starred:'is:starred' }
+    const query = [folderQueries[folder] || 'in:inbox', search].filter(Boolean).join(' ')
+    const list = await (await gmailFetch(`/messages?maxResults=30&q=${encodeURIComponent(query)}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`)).json()
     const messages = await Promise.all((list.messages ?? []).map(async ({ id }: { id: string }) => {
-      const item = await (await gmailFetch(`/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`)).json()
+      const item = await (await gmailFetch(`/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`)).json()
       const headers = item.payload?.headers ?? []
-      return { id, threadId: item.threadId, from: header(headers, 'From'), subject: header(headers, 'Subject') || '(sans objet)', date: header(headers, 'Date'), snippet: item.snippet ?? '', unread: (item.labelIds ?? []).includes('UNREAD') }
+      return { id, threadId: item.threadId, from: header(headers, 'From'), to: header(headers, 'To'), subject: header(headers, 'Subject') || '(sans objet)', date: header(headers, 'Date'), snippet: item.snippet ?? '', unread: (item.labelIds ?? []).includes('UNREAD'), labels:item.labelIds ?? [] }
     }))
-    return NextResponse.json({ messages })
+    return NextResponse.json({ messages, nextPageToken:list.nextPageToken ?? null, total:list.resultSizeEstimate ?? 0 })
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Erreur Gmail' }, { status: 502 }) }
+}
+
+export async function PATCH(request: NextRequest) {
+  const access = await getActionContext('messaging')
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: 403 })
+  try {
+    const input = await request.json()
+    const id = String(input.id ?? ''), action = String(input.action ?? '')
+    if (!id) return NextResponse.json({ error:'Message requis' }, { status:400 })
+    if (action === 'trash') await gmailFetch(`/messages/${encodeURIComponent(id)}/trash`, { method:'POST' })
+    else if (action === 'restore') await gmailFetch(`/messages/${encodeURIComponent(id)}/untrash`, { method:'POST' })
+    else {
+      const addLabelIds = action === 'star' ? ['STARRED'] : action === 'unread' ? ['UNREAD'] : []
+      const removeLabelIds = action === 'unstar' ? ['STARRED'] : action === 'read' ? ['UNREAD'] : []
+      await gmailFetch(`/messages/${encodeURIComponent(id)}/modify`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({addLabelIds,removeLabelIds}) })
+    }
+    return NextResponse.json({ success:true })
+  } catch (error) { return NextResponse.json({ error:error instanceof Error ? error.message : 'Action impossible' }, {status:502}) }
 }
 
 export async function POST(request: NextRequest) {
