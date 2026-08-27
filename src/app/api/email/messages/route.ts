@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const folder = request.nextUrl.searchParams.get('folder') || 'inbox'
     const search = request.nextUrl.searchParams.get('q')?.trim() || ''
     const pageToken = request.nextUrl.searchParams.get('pageToken') || ''
-    const folderQueries: Record<string,string> = { inbox:'in:inbox', sent:'in:sent', drafts:'in:drafts', trash:'in:trash', starred:'is:starred' }
+    const folderQueries: Record<string,string> = { inbox:'in:inbox', sent:'in:sent', drafts:'in:drafts', trash:'in:trash', starred:'is:starred', important:'is:important' }
     const query = [folderQueries[folder] || 'in:inbox', search].filter(Boolean).join(' ')
     const list = await (await gmailFetch(`/messages?maxResults=30&q=${encodeURIComponent(query)}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`)).json()
     const messages = await Promise.all((list.messages ?? []).map(async ({ id }: { id: string }) => {
@@ -37,8 +37,8 @@ export async function PATCH(request: NextRequest) {
     if (action === 'trash') await gmailFetch(`/messages/${encodeURIComponent(id)}/trash`, { method:'POST' })
     else if (action === 'restore') await gmailFetch(`/messages/${encodeURIComponent(id)}/untrash`, { method:'POST' })
     else {
-      const addLabelIds = action === 'star' ? ['STARRED'] : action === 'unread' ? ['UNREAD'] : []
-      const removeLabelIds = action === 'unstar' ? ['STARRED'] : action === 'read' ? ['UNREAD'] : []
+      const addLabelIds = action === 'star' ? ['STARRED'] : action === 'important' ? ['IMPORTANT'] : action === 'unread' ? ['UNREAD'] : []
+      const removeLabelIds = action === 'unstar' ? ['STARRED'] : action === 'unimportant' ? ['IMPORTANT'] : action === 'read' ? ['UNREAD'] : []
       await gmailFetch(`/messages/${encodeURIComponent(id)}/modify`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({addLabelIds,removeLabelIds}) })
     }
     return NextResponse.json({ success:true })
@@ -50,8 +50,10 @@ export async function POST(request: NextRequest) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: 403 })
   try {
     const input = await request.json()
-    const to = String(input.to ?? '').trim(), subject = String(input.subject ?? '').trim(), body = String(input.body ?? '').trim()
-    if (!/^\S+@\S+\.\S+$/.test(to) || !subject || !body) return NextResponse.json({ error: 'Destinataire, objet et message sont requis' }, { status: 400 })
+    const to = String(input.to ?? '').trim(), subject = String(input.subject ?? '').trim()
+    const body = String(input.body ?? '').trim().replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, '').replace(/javascript:/gi, '')
+    const readableBody = body.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim()
+    if (!/^\S+@\S+\.\S+$/.test(to) || !subject || !readableBody) return NextResponse.json({ error: 'Destinataire, objet et message sont requis' }, { status: 400 })
     if (subject.length > 300 || body.length > 100_000) return NextResponse.json({ error: 'Message trop long' }, { status: 400 })
     const { account, supabase, user } = await getOwnEmailAccount()
     if (!account || !user) return NextResponse.json({ error: 'Boîte Gmail non connectée' }, { status: 409 })

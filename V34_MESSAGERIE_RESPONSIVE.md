@@ -10,10 +10,13 @@
 ## Fonctions essentielles
 
 - Recherche et tri : récents, anciens, expéditeur, non lus.
-- Répondre, répondre à tous, transférer, archiver, suivre, marquer non lu, supprimer/restaurer.
+- Répondre, répondre à tous, transférer, archiver, suivre, marquer important, marquer non lu, supprimer/restaurer.
+- Dossiers distincts « Suivis » et « Importants ».
 - Pièces jointes à l'envoi : 5 fichiers, 10 Mo maximum.
 - Priorité normale ou haute.
-- Signature et police de rédaction personnelles, synchronisées par compte dans Supabase.
+- Barre de rédaction compacte : gras, italique, souligné et listes.
+- Signatures distinctes et activables pour les nouveaux messages et pour les réponses/transferts.
+- Polices personnelles, dont Century Gothic avec une police de repli compatible.
 - Gestion sûre des réponses serveur non JSON.
 
 ## Installation

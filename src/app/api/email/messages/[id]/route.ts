@@ -15,7 +15,7 @@ export async function PATCH(request:NextRequest,{params}:{params:Promise<{id:str
   try{const {id}=await params;const {action}=await request.json() as {action:string}
     if(action==='trash')await gmailFetch(`/messages/${id}/trash`,{method:'POST'})
     else if(action==='restore')await gmailFetch(`/messages/${id}/untrash`,{method:'POST'})
-    else {const addLabelIds=action==='star'?['STARRED']:action==='unread'?['UNREAD']:[];const removeLabelIds=action==='unstar'?['STARRED']:action==='read'?['UNREAD']:action==='archive'?['INBOX']:[];await gmailFetch(`/messages/${id}/modify`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addLabelIds,removeLabelIds})})}
+    else {const addLabelIds=action==='star'?['STARRED']:action==='important'?['IMPORTANT']:action==='unread'?['UNREAD']:[];const removeLabelIds=action==='unstar'?['STARRED']:action==='unimportant'?['IMPORTANT']:action==='read'?['UNREAD']:action==='archive'?['INBOX']:[];await gmailFetch(`/messages/${id}/modify`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addLabelIds,removeLabelIds})})}
     return NextResponse.json({success:true})
   }catch(error){return NextResponse.json({error:error instanceof Error?error.message:'Action impossible'},{status:400})}
 }

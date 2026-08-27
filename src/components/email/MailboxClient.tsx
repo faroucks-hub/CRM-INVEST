@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
+  BadgeAlert,
+  Bold,
   ArrowLeft,
   Check,
   ChevronLeft,
   ChevronRight,
   Inbox,
+  Italic,
   Loader2,
+  List,
   Mail,
   MailOpen,
   Menu,
@@ -24,12 +28,13 @@ import {
   SlidersHorizontal,
   Star,
   Trash2,
+  Underline,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-type Folder = "inbox" | "starred" | "sent" | "drafts" | "trash";
+type Folder = "inbox" | "starred" | "important" | "sent" | "drafts" | "trash";
 type Summary = {
   id: string;
   threadId: string;
@@ -51,10 +56,12 @@ type Detail = Summary & {
 };
 type Attachment = { name: string; type: string; data: string; size: number };
 type Draft = { to: string; cc: string; subject: string; body: string; importance: "normal" | "high"; attachments: Attachment[] };
-type Preferences = { signature: string; font: "sans" | "serif" | "mono" };
+type ComposeFont = "sans" | "century-gothic" | "serif" | "mono";
+type Preferences = { signature: string; signatureEnabled: boolean; replySignature: string; replySignatureEnabled: boolean; font: ComposeFont };
 const folders: { key: Folder; label: string; icon: typeof Inbox }[] = [
   { key: "inbox", label: "Boîte de réception", icon: Inbox },
   { key: "starred", label: "Suivis", icon: Star },
+  { key: "important", label: "Importants", icon: BadgeAlert },
   { key: "sent", label: "Messages envoyés", icon: Send },
   { key: "drafts", label: "Brouillons", icon: PenLine },
   { key: "trash", label: "Corbeille", icon: Trash2 },
@@ -86,6 +93,9 @@ const shortDate = (value: string) => {
     : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 };
 const compactBody = (value: string) => value.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const textToHtml = (value: string) => escapeHtml(value).replace(/\n/g, "<br>");
+const signatureHtml = (value: string, enabled: boolean) => enabled && value.trim() ? `<br><br>${textToHtml(value.trim())}` : "";
 async function responseJson(response: Response) {
   const text = await response.text();
   try { return JSON.parse(text); } catch { throw new Error(`Réponse serveur invalide (${response.status})`); }
@@ -115,7 +125,7 @@ export default function MailboxClient({
     [sort, setSort] = useState<"newest" | "oldest" | "sender" | "unread">("newest"),
     [nextPage, setNextPage] = useState<string | null>(null),
     [pageTokens, setPageTokens] = useState<string[]>([]);
-  const [preferences, setPreferences] = useState<Preferences>({ signature: "", font: "sans" });
+  const [preferences, setPreferences] = useState<Preferences>({ signature: "", signatureEnabled: true, replySignature: "", replySignatureEnabled: true, font: "sans" });
   const [draft, setDraft] = useState<Draft>({
       to: initialTo,
       cc: "",
@@ -129,12 +139,12 @@ export default function MailboxClient({
 
   useEffect(() => {
     if (!connected) return;
-    void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", font: data.font || "sans" })).catch(() => undefined);
+    void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", signatureEnabled: data.signatureEnabled !== false, replySignature: data.replySignature || "", replySignatureEnabled: data.replySignatureEnabled !== false, font: data.font || "sans" })).catch(() => undefined);
   }, [connected]);
 
   const newMessage = () => {
     setSelected(null);
-    setDraft({ to: initialTo, cc: "", subject: "", body: preferences.signature ? `\n\n${preferences.signature}` : "", importance: "normal", attachments: [] });
+    setDraft({ to: initialTo, cc: "", subject: "", body: signatureHtml(preferences.signature, preferences.signatureEnabled), importance: "normal", attachments: [] });
     setCompose(true);
   };
 
@@ -209,7 +219,7 @@ export default function MailboxClient({
       subject: selected.subject.startsWith("Re:")
         ? selected.subject
         : `Re: ${selected.subject}`,
-      body: `${preferences.signature ? `\n\n${preferences.signature}` : ""}\n\n--- Message précédent ---\n${compactBody(selected.text || selected.snippet)}`,
+      body: `${signatureHtml(preferences.replySignature || preferences.signature, preferences.replySignatureEnabled)}<br><br><hr><p><strong>Message précédent</strong></p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>`,
       importance: "normal",
       attachments: [],
     });
@@ -221,7 +231,7 @@ export default function MailboxClient({
       to: address(selected.from),
       cc: [selected.to, selected.cc].filter(Boolean).join(", "),
       subject: selected.subject.startsWith("Re:") ? selected.subject : `Re: ${selected.subject}`,
-      body: `${preferences.signature ? `\n\n${preferences.signature}` : ""}\n\n--- Message précédent ---\n${compactBody(selected.text || selected.snippet)}`,
+      body: `${signatureHtml(preferences.replySignature || preferences.signature, preferences.replySignatureEnabled)}<br><br><hr><p><strong>Message précédent</strong></p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>`,
       importance: "normal",
       attachments: [],
     });
@@ -233,7 +243,7 @@ export default function MailboxClient({
       to: "",
       cc: "",
       subject: selected.subject.startsWith("Tr:") ? selected.subject : `Tr: ${selected.subject}`,
-      body: `\n\n--- Message transféré ---\nDe : ${selected.from}\nDate : ${selected.date}\nObjet : ${selected.subject}\n\n${compactBody(selected.text || selected.snippet)}${preferences.signature ? `\n\n${preferences.signature}` : ""}`,
+      body: `<br><br><hr><p><strong>Message transféré</strong><br>De : ${escapeHtml(selected.from)}<br>Date : ${escapeHtml(selected.date)}<br>Objet : ${escapeHtml(selected.subject)}</p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>${signatureHtml(preferences.signature, preferences.signatureEnabled)}`,
       importance: "normal",
       attachments: [],
     });
@@ -667,6 +677,9 @@ function MessageView({
               )}
             />
           </button>
+          <button title={message.labels.includes("IMPORTANT") ? "Retirer Important" : "Marquer Important"} onClick={() => onAction(message.labels.includes("IMPORTANT") ? "unimportant" : "important")} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+            <BadgeAlert className={cn("h-4 w-4", message.labels.includes("IMPORTANT") && "fill-amber-100 text-amber-600")} />
+          </button>
           <button
             title="Supprimer"
             onClick={() =>
@@ -766,6 +779,7 @@ function Compose({
     })));
     setDraft({ ...draft, attachments: [...draft.attachments, ...encoded] });
   };
+  const fontStyle = preferences.font === "century-gothic" ? { fontFamily: '"Century Gothic", "Avenir Next", Arial, sans-serif' } : undefined;
   const fontClass = preferences.font === "serif" ? "font-serif" : preferences.font === "mono" ? "font-mono" : "font-sans";
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-end bg-navy-950/25 p-0 sm:p-5">
@@ -814,12 +828,7 @@ function Compose({
               <option value="high">Haute</option>
             </select>
           </div>
-          <textarea
-            value={draft.body}
-            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-            className={cn("min-h-[280px] w-full resize-none py-5 text-sm leading-6 outline-none", fontClass)}
-            placeholder="Rédigez votre message…"
-          />
+          <RichTextEditor value={draft.body} onChange={(body) => setDraft({ ...draft, body })} className={fontClass} style={fontStyle} />
           {draft.attachments.length > 0 && <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">{draft.attachments.map((file, index) => <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600"><Paperclip className="h-3.5 w-3.5"/><span className="max-w-48 truncate">{file.name}</span><button onClick={() => setDraft({ ...draft, attachments: draft.attachments.filter((_, i) => i !== index) })} className="text-slate-400 hover:text-red-600"><X className="h-3.5 w-3.5"/></button></span>)}</div>}
         </div>
         <footer className="flex items-center gap-3 border-t border-slate-200 px-5 py-4">
@@ -849,6 +858,38 @@ function Compose({
   );
 }
 
+function RichTextEditor({ value, onChange, className, style }: { value: string; onChange: (value: string) => void; className?: string; style?: React.CSSProperties }) {
+  const editor = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editor.current && editor.current.innerHTML !== value) editor.current.innerHTML = value;
+  }, [value]);
+  const command = (name: string) => {
+    editor.current?.focus();
+    document.execCommand(name, false);
+    if (editor.current) onChange(editor.current.innerHTML);
+  };
+  const tools = [
+    { name: "bold", label: "Gras", icon: Bold },
+    { name: "italic", label: "Italique", icon: Italic },
+    { name: "underline", label: "Souligné", icon: Underline },
+    { name: "insertUnorderedList", label: "Liste", icon: List },
+  ];
+  return <div className="py-3">
+    <div className="flex items-center gap-1 rounded-t-xl border border-slate-200 bg-slate-50 px-2 py-1.5">
+      {tools.map((tool) => <button key={tool.name} type="button" title={tool.label} onMouseDown={(event) => event.preventDefault()} onClick={() => command(tool.name)} className="rounded-lg p-2 text-slate-500 hover:bg-white hover:text-navy-900"><tool.icon className="h-4 w-4" /></button>)}
+    </div>
+    <div ref={editor} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" data-placeholder="Rédigez votre message…" onInput={(event) => onChange(event.currentTarget.innerHTML)} className={cn("min-h-[260px] w-full overflow-y-auto rounded-b-xl border-x border-b border-slate-200 p-4 text-sm leading-6 outline-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)] focus:border-gold-400", className)} style={style} />
+  </div>;
+}
+
+function SignatureField({ label, enabled, value, onEnabled, onValue }: { label: string; enabled: boolean; value: string; onEnabled: (value: boolean) => void; onValue: (value: string) => void }) {
+  return <div>
+    <label className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700"><span>{label}</span><input type="checkbox" checked={enabled} onChange={(event) => onEnabled(event.target.checked)} className="h-4 w-4 accent-amber-500" /></label>
+    <textarea disabled={!enabled} value={value} onChange={(event) => onValue(event.target.value)} rows={4} maxLength={2000} placeholder={"Farouck Oumar SANOGO\nInternational Project Engineer\nIM ÉNERGIE"} className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm leading-6 outline-none focus:border-gold-400 disabled:bg-slate-50 disabled:text-slate-400" />
+    <span className="mt-1 block text-right text-xs text-slate-400">{value.length}/2000</span>
+  </div>;
+}
+
 function SettingsPanel({ email, value, onChange, onClose }: { email: string; value: Preferences; onChange: (value: Preferences) => void; onClose: () => void }) {
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -868,8 +909,9 @@ function SettingsPanel({ email, value, onChange, onClose }: { email: string; val
     <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
       <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="font-bold text-navy-950">Signature et rédaction</h2><p className="mt-1 text-xs text-slate-400">Préférences personnelles pour {email}</p></div><button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5"/></button></header>
       <div className="space-y-5 p-5">
-        <label className="block"><span className="text-sm font-semibold text-slate-700">Police de rédaction</span><select value={draft.font} onChange={(e) => setDraft({ ...draft, font: e.target.value as Preferences["font"] })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-gold-400"><option value="sans">Sans serif — recommandée</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></label>
-        <label className="block"><span className="text-sm font-semibold text-slate-700">Signature automatique</span><textarea value={draft.signature} onChange={(e) => setDraft({ ...draft, signature: e.target.value })} rows={7} maxLength={2000} placeholder={"Farouck Oumar SANOGO\nInternational Project Engineer\nIM ÉNERGIE\ncontact@im-energie.com"} className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm leading-6 outline-none focus:border-gold-400"/><span className="mt-1 block text-right text-xs text-slate-400">{draft.signature.length}/2000</span></label>
+        <label className="block"><span className="text-sm font-semibold text-slate-700">Police de rédaction</span><select value={draft.font} onChange={(e) => setDraft({ ...draft, font: e.target.value as Preferences["font"] })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-gold-400"><option value="sans">Sans serif — recommandée</option><option value="century-gothic">Century Gothic</option><option value="serif">Serif</option><option value="mono">Monospace</option></select><span className="mt-1 block text-xs text-slate-400">Arial est utilisée en repli si Century Gothic n’est pas installée.</span></label>
+        <SignatureField label="Signature — nouveaux messages" enabled={draft.signatureEnabled} value={draft.signature} onEnabled={(signatureEnabled) => setDraft({ ...draft, signatureEnabled })} onValue={(signature) => setDraft({ ...draft, signature })} />
+        <SignatureField label="Signature — réponses et transferts" enabled={draft.replySignatureEnabled} value={draft.replySignature} onEnabled={(replySignatureEnabled) => setDraft({ ...draft, replySignatureEnabled })} onValue={(replySignature) => setDraft({ ...draft, replySignature })} />
       </div>
       <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button><button onClick={() => void save()} disabled={saving} className="rounded-xl bg-navy-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-navy-800 disabled:opacity-60">{saving ? "Enregistrement…" : "Enregistrer"}</button></footer>
     </div>

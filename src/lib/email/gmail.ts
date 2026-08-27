@@ -73,9 +73,9 @@ export function encodeMessage({ from, to, cc, subject, body, inReplyTo, referenc
   if (importance === 'high') lines.push('Importance: high', 'Priority: urgent', 'X-Priority: 1')
   if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`)
   if (references) lines.push(`References: ${references}`)
-  if (!attachments.length) lines.push('Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(body).toString('base64'))
+  if (!attachments.length) lines.push('Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(body).toString('base64'))
   else {
-    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`, '', `--${boundary}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(body).toString('base64'))
+    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`, '', `--${boundary}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(body).toString('base64'))
     for (const file of attachments) lines.push(`--${boundary}`, `Content-Type: ${file.type || 'application/octet-stream'}; name="${file.name.replace(/["\r\n]/g, '_')}"`, 'Content-Transfer-Encoding: base64', `Content-Disposition: attachment; filename="${file.name.replace(/["\r\n]/g, '_')}"`, '', file.data.replace(/^data:[^,]+,/, ''))
     lines.push(`--${boundary}--`)
   }
