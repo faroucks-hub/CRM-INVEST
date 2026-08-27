@@ -884,8 +884,13 @@ function RichTextEditor({ value, onChange, className, style }: { value: string; 
 
 function SignatureField({ label, enabled, value, onEnabled, onValue }: { label: string; enabled: boolean; value: string; onEnabled: (value: boolean) => void; onValue: (value: string) => void }) {
   return <div>
-    <label className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700"><span>{label}</span><input type="checkbox" checked={enabled} onChange={(event) => onEnabled(event.target.checked)} className="h-4 w-4 accent-amber-500" /></label>
-    <textarea disabled={!enabled} value={value} onChange={(event) => onValue(event.target.value)} rows={4} maxLength={2000} placeholder={"Farouck Oumar SANOGO\nInternational Project Engineer\nIM ÉNERGIE"} className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm leading-6 outline-none focus:border-gold-400 disabled:bg-slate-50 disabled:text-slate-400" />
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <button type="button" role="switch" aria-checked={enabled} onClick={() => onEnabled(!enabled)} className={cn("relative h-6 w-11 rounded-full transition-colors", enabled ? "bg-gold-400" : "bg-slate-300")}>
+        <span className={cn("absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform", enabled ? "left-6" : "left-1")} />
+      </button>
+    </div>
+    <textarea disabled={!enabled} value={value} onChange={(event) => onValue(event.target.value)} rows={3} maxLength={2000} placeholder="Saisissez votre signature…" className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm leading-6 outline-none focus:border-gold-400 disabled:bg-slate-50 disabled:text-slate-400" />
     <span className="mt-1 block text-right text-xs text-slate-400">{value.length}/2000</span>
   </div>;
 }
@@ -905,15 +910,20 @@ function SettingsPanel({ email, value, onChange, onClose }: { email: string; val
     } catch (error) { toast.error(error instanceof Error ? error.message : "Enregistrement impossible"); }
     finally { setSaving(false); }
   };
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-navy-950/35 p-4">
-    <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-      <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="font-bold text-navy-950">Signature et rédaction</h2><p className="mt-1 text-xs text-slate-400">Préférences personnelles pour {email}</p></div><button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5"/></button></header>
-      <div className="space-y-5 p-5">
+  const preview = draft.signatureEnabled ? draft.signature : draft.replySignatureEnabled ? draft.replySignature : "";
+  const previewStyle = draft.font === "century-gothic" ? { fontFamily: '\"Century Gothic\", \"Avenir Next\", Arial, sans-serif' } : undefined;
+  const previewClass = draft.font === "serif" ? "font-serif" : draft.font === "mono" ? "font-mono" : "font-sans";
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-navy-950/35 p-3 sm:p-5">
+    <div className="flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><div className="min-w-0"><h2 className="font-bold text-navy-950">Signature et rédaction</h2><p className="mt-1 truncate text-xs text-slate-400">Préférences personnelles pour {email}</p></div><button onClick={onClose} className="ml-3 rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5"/></button></header>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
         <label className="block"><span className="text-sm font-semibold text-slate-700">Police de rédaction</span><select value={draft.font} onChange={(e) => setDraft({ ...draft, font: e.target.value as Preferences["font"] })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-gold-400"><option value="sans">Sans serif — recommandée</option><option value="century-gothic">Century Gothic</option><option value="serif">Serif</option><option value="mono">Monospace</option></select><span className="mt-1 block text-xs text-slate-400">Arial est utilisée en repli si Century Gothic n’est pas installée.</span></label>
         <SignatureField label="Signature — nouveaux messages" enabled={draft.signatureEnabled} value={draft.signature} onEnabled={(signatureEnabled) => setDraft({ ...draft, signatureEnabled })} onValue={(signature) => setDraft({ ...draft, signature })} />
+        <div className="flex justify-end"><button type="button" onClick={() => setDraft({ ...draft, replySignature: draft.signature, replySignatureEnabled: draft.signatureEnabled })} disabled={!draft.signature.trim()} className="text-xs font-semibold text-navy-800 hover:text-gold-600 disabled:cursor-not-allowed disabled:text-slate-300">Utiliser la même signature pour les réponses</button></div>
         <SignatureField label="Signature — réponses et transferts" enabled={draft.replySignatureEnabled} value={draft.replySignature} onEnabled={(replySignatureEnabled) => setDraft({ ...draft, replySignatureEnabled })} onValue={(replySignature) => setDraft({ ...draft, replySignature })} />
+        {preview.trim() && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Aperçu</p><div className={cn("whitespace-pre-line text-sm leading-5 text-slate-700", previewClass)} style={previewStyle}>{preview}</div></div>}
       </div>
-      <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button><button onClick={() => void save()} disabled={saving} className="rounded-xl bg-navy-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-navy-800 disabled:opacity-60">{saving ? "Enregistrement…" : "Enregistrer"}</button></footer>
+      <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4"><button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button><button onClick={() => void save()} disabled={saving} className="rounded-xl bg-navy-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-navy-800 disabled:opacity-60">{saving ? "Enregistrement…" : "Enregistrer"}</button></footer>
     </div>
   </div>;
 }
