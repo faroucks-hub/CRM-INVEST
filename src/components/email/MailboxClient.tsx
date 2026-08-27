@@ -1,63 +1,733 @@
-'use client'
+"use client";
 
-import { FormEvent, useEffect, useState } from 'react'
-import { ArchiveRestore, ChevronLeft, ChevronRight, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, PenLine, RefreshCw, Reply, Search, Send, SendHorizontal, Star, Trash2, Unplug, X } from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Archive,
+  ArrowLeft,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Inbox,
+  Loader2,
+  Mail,
+  MailOpen,
+  Menu,
+  MoreHorizontal,
+  Paperclip,
+  PenLine,
+  RefreshCw,
+  Reply,
+  Search,
+  Send,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-type Folder = 'inbox'|'starred'|'sent'|'drafts'|'trash'
-type Summary = { id:string; threadId:string; from:string; to:string; subject:string; date:string; snippet:string; unread:boolean; labels:string[] }
-type Detail = { id:string; threadId:string; from:string; to:string; subject:string; date:string; messageId:string; references:string; body:string; labels:string[] }
-type Attachment = { name:string; type:string; data:string }
+type Folder = "inbox" | "starred" | "sent" | "drafts" | "trash";
+type Summary = {
+  id: string;
+  threadId: string;
+  labels: string[];
+  snippet: string;
+  from: string;
+  to: string;
+  subject: string;
+  date: string;
+  internalDate: string;
+};
+type Detail = Summary & {
+  cc: string;
+  messageId: string;
+  html: string;
+  text: string;
+};
+const folders: { key: Folder; label: string; icon: typeof Inbox }[] = [
+  { key: "inbox", label: "Boîte de réception", icon: Inbox },
+  { key: "starred", label: "Suivis", icon: Star },
+  { key: "sent", label: "Messages envoyés", icon: Send },
+  { key: "drafts", label: "Brouillons", icon: PenLine },
+  { key: "trash", label: "Corbeille", icon: Trash2 },
+];
+const initials = (value: string) => {
+  const clean = value.replace(/<[^>]+>/g, "").trim();
+  return (
+    clean
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((x) => x[0])
+      .join("")
+      .toUpperCase() || "M"
+  );
+};
+const sender = (value: string) =>
+  value
+    .replace(/<[^>]+>/g, "")
+    .replace(/^"|"$/g, "")
+    .trim() || "Expéditeur";
+const address = (value: string) =>
+  value.match(/<([^>]+)>/)?.[1] || value.trim();
+const shortDate = (value: string) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  return d.toDateString() === now.toDateString()
+    ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+};
 
-const folders:Array<{id:Folder;label:string;icon:typeof Inbox}> = [
-  {id:'inbox',label:'Boîte de réception',icon:Inbox},
-  {id:'starred',label:'Messages suivis',icon:Star},
-  {id:'sent',label:'Messages envoyés',icon:SendHorizontal},
-  {id:'drafts',label:'Brouillons',icon:MailOpen},
-  {id:'trash',label:'Corbeille',icon:Trash2},
-]
-const cleanName=(value:string)=>value.replace(/<[^>]+>/,'').replace(/^"|"$/g,'').trim()||value
-const initials=(value:string)=>cleanName(value).split(/\s+/).slice(0,2).map(part=>part[0]?.toUpperCase()).join('')||'M'
-function shortDate(value:string){const date=new Date(value);if(Number.isNaN(date.getTime()))return value;return date.toDateString()===new Date().toDateString()?date.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):date.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}
+export default function MailboxClient({
+  connected,
+  email,
+}: {
+  connected: boolean;
+  email: string;
+}) {
+  const [folder, setFolder] = useState<Folder>("inbox"),
+    [messages, setMessages] = useState<Summary[]>([]),
+    [selected, setSelected] = useState<Detail | null>(null);
+  const [loading, setLoading] = useState(false),
+    [detailLoading, setDetailLoading] = useState(false),
+    [search, setSearch] = useState(""),
+    [query, setQuery] = useState("");
+  const [compose, setCompose] = useState(false),
+    [mobileFolders, setMobileFolders] = useState(false),
+    [nextPage, setNextPage] = useState<string | null>(null),
+    [pageTokens, setPageTokens] = useState<string[]>([]);
+  const [draft, setDraft] = useState({ to: "", cc: "", subject: "", body: "" }),
+    [sending, setSending] = useState(false);
+  const currentFolder = folders.find((item) => item.key === folder)!;
 
-export default function MailboxClient({connected,email,initialTo='',initialLeadId=''}:{connected:boolean;email?:string;initialTo?:string;initialLeadId?:string}){
-  const [folder,setFolder]=useState<Folder>('inbox'),[messages,setMessages]=useState<Summary[]>([]),[selected,setSelected]=useState<Detail|null>(null)
-  const [loading,setLoading]=useState(false),[compose,setCompose]=useState(Boolean(initialTo)),[mobileFolders,setMobileFolders]=useState(false)
-  const [query,setQuery]=useState(''),[activeQuery,setActiveQuery]=useState(''),[nextToken,setNextToken]=useState(''),[tokens,setTokens]=useState(['']),[page,setPage]=useState(0)
-  const [to,setTo]=useState(initialTo),[subject,setSubject]=useState(''),[body,setBody]=useState(''),[attachments,setAttachments]=useState<Attachment[]>([])
-  const folderLabel=folders.find(item=>item.id===folder)?.label
+  const load = useCallback(
+    async (token = "") => {
+      if (!connected) return;
+      setLoading(true);
+      try {
+        const p = new URLSearchParams({ folder });
+        if (query) p.set("q", query);
+        if (token) p.set("pageToken", token);
+        const r = await fetch(`/api/email/messages?${p}`);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error);
+        setMessages(data.messages || []);
+        setNextPage(data.nextPageToken);
+        setSelected(null);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Chargement impossible");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [connected, folder, query],
+  );
+  useEffect(() => {
+    setPageTokens([]);
+    void load();
+  }, [load]);
+  const open = async (item: Summary) => {
+    setDetailLoading(true);
+    try {
+      const r = await fetch(`/api/email/messages/${item.id}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      setSelected({ ...item, ...data });
+      setMessages((list) =>
+        list.map((m) =>
+          m.id === item.id
+            ? { ...m, labels: m.labels.filter((x) => x !== "UNREAD") }
+            : m,
+        ),
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lecture impossible");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+  const act = async (action: string) => {
+    if (!selected) return;
+    const r = await fetch(`/api/email/messages/${selected.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await r.json();
+    if (!r.ok) return toast.error(data.error);
+    toast.success(
+      action === "trash"
+        ? "Message placé dans la corbeille"
+        : "Message mis à jour",
+    );
+    setSelected(null);
+    void load();
+  };
+  const reply = () => {
+    if (!selected) return;
+    setDraft({
+      to: address(selected.from),
+      cc: "",
+      subject: selected.subject.startsWith("Re:")
+        ? selected.subject
+        : `Re: ${selected.subject}`,
+      body: "\n\n---\n" + selected.snippet,
+    });
+    setCompose(true);
+  };
+  const sendMail = async () => {
+    if (!draft.to.trim()) return toast.error("Destinataire requis");
+    setSending(true);
+    try {
+      const r = await fetch("/api/email/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...draft,
+          threadId: selected?.threadId,
+          replyToMessageId: selected?.messageId,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      toast.success("Message envoyé");
+      setCompose(false);
+      setDraft({ to: "", cc: "", subject: "", body: "" });
+      if (folder === "sent") void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Envoi impossible");
+    } finally {
+      setSending(false);
+    }
+  };
+  const displayed = useMemo(() => messages, [messages]);
+  if (!connected) return <ConnectScreen />;
 
-  async function load(token='',search=activeQuery){setLoading(true);const params=new URLSearchParams({folder});if(search)params.set('q',search);if(token)params.set('pageToken',token);const response=await fetch(`/api/email/messages?${params}`);const json=await response.json();setLoading(false);if(!response.ok)return toast.error(json.error);setMessages(json.messages??[]);setNextToken(json.nextPageToken??'')}
-  useEffect(()=>{if(connected){setSelected(null);setTokens(['']);setPage(0);void load('',activeQuery)}} // eslint-disable-next-line react-hooks/exhaustive-deps
-  ,[connected,folder])
-  async function open(id:string){setLoading(true);const response=await fetch(`/api/email/messages?id=${encodeURIComponent(id)}`);const json=await response.json();setLoading(false);if(!response.ok)return toast.error(json.error);setSelected(json);setMessages(items=>items.map(item=>item.id===id?{...item,unread:false}:item))}
-  async function act(action:'trash'|'restore'|'star'|'unstar'|'unread') {if(!selected)return;const response=await fetch('/api/email/messages',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({id:selected.id,action})});const json=await response.json();if(!response.ok)return toast.error(json.error);if(action==='trash'||action==='restore'){setSelected(null);void load(tokens[page]);return}const add=action==='star'?'STARRED':action==='unread'?'UNREAD':'';const remove=action==='unstar'?'STARRED':'';setSelected(item=>item?{...item,labels:[...item.labels.filter(label=>label!==remove),...(add&&!item.labels.includes(add)?[add]:[])]}:item)}
-  function fresh(){setSelected(null);setTo(initialTo);setSubject('');setBody('');setAttachments([]);setCompose(true)}
-  function reply(){if(!selected)return;setTo(selected.from.match(/<([^>]+)>/)?.[1]??selected.from);setSubject(/^re:/i.test(selected.subject)?selected.subject:`Re: ${selected.subject}`);setBody(`\n\n--- Message précédent ---\n${selected.body}`);setCompose(true)}
-  async function send(){if(!to.trim())return toast.error('Ajoutez un destinataire');setLoading(true);const response=await fetch('/api/email/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({to,subject,body,attachments,threadId:selected?.threadId,inReplyTo:selected?.messageId,references:selected?.references,leadId:initialLeadId||undefined})});const json=await response.json();setLoading(false);if(!response.ok)return toast.error(json.error);toast.success('E-mail envoyé');setCompose(false);setBody('');setAttachments([]);if(folder==='sent')void load()}
-  async function chooseFiles(files:FileList|null){if(!files)return;const picked=[...files].slice(0,5);if(picked.reduce((total,file)=>total+file.size,0)>10_000_000)return toast.error('Maximum 10 Mo');const encoded=await Promise.all(picked.map(file=>new Promise<Attachment>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type,data:String(reader.result).split(',')[1]});reader.onerror=reject;reader.readAsDataURL(file)})));setAttachments(encoded)}
-  async function disconnect(){if(!confirm('Déconnecter votre boîte Gmail du CRM ?'))return;await fetch('/api/email/messages',{method:'DELETE'});location.reload()}
-  function search(event:FormEvent){event.preventDefault();setActiveQuery(query);setTokens(['']);setPage(0);setSelected(null);void load('',query)}
+  return (
+    <div className="mx-auto flex h-[calc(100dvh-8.25rem)] min-h-[610px] w-full max-w-[1700px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <aside
+        className={cn(
+          "absolute inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-white p-4 transition-transform lg:static lg:translate-x-0",
+          mobileFolders ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="mb-5 flex items-center justify-between px-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[.16em] text-slate-400">
+              Messagerie
+            </p>
+            <p className="mt-1 max-w-[190px] truncate text-sm font-semibold text-navy-950">
+              {email}
+            </p>
+          </div>
+          <button
+            className="rounded-lg p-2 text-slate-400 lg:hidden"
+            onClick={() => setMobileFolders(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <button
+          onClick={() => {
+            setCompose(true);
+            setMobileFolders(false);
+          }}
+          className="mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-navy-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800"
+        >
+          <PenLine className="h-4 w-4" />
+          Nouveau message
+        </button>
+        <nav className="space-y-1">
+          {folders.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setFolder(item.key);
+                  setMobileFolders(false);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium",
+                  folder === item.key
+                    ? "bg-gold-50 text-gold-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-navy-950",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Google Workspace connecté
+          </div>
+        </div>
+      </aside>
+      {mobileFolders && (
+        <button
+          aria-label="Fermer"
+          className="fixed inset-0 z-20 bg-navy-950/30 lg:hidden"
+          onClick={() => setMobileFolders(false)}
+        />
+      )}
 
-  if(!connected)return <div className="mx-auto max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm"><Mail className="mx-auto h-10 w-10 text-gold-500"/><h2 className="mt-4 text-xl font-bold text-navy-950">Connecter ma boîte professionnelle</h2><p className="mt-2 text-sm leading-6 text-slate-500">Chaque utilisateur connecte sa propre boîte Google Workspace. Le CRM ne stocke jamais votre mot de passe.</p><a href="/api/email/google/connect" className="btn btn-primary mt-6">Connecter avec Google</a></div>
+      <section
+        className={cn(
+          "min-w-0 flex-col border-r border-slate-200 lg:flex lg:w-[410px] lg:flex-none xl:w-[470px]",
+          selected ? "hidden" : "flex flex-1",
+        )}
+      >
+        <header className="border-b border-slate-200 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileFolders(true)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-bold text-navy-950">
+                {currentFolder.label}
+              </h1>
+              <p className="text-xs text-slate-400">
+                {messages.length} message{messages.length !== 1 ? "s" : ""}{" "}
+                affiché{messages.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <button
+              onClick={() => load(pageTokens.at(-1) || "")}
+              disabled={loading}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+            >
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </button>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setQuery(search.trim());
+            }}
+            className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-gold-400 focus-within:bg-white"
+          >
+            <Search className="h-4 w-4 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              placeholder="Rechercher dans les messages…"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setQuery("");
+                }}
+              >
+                <X className="h-4 w-4 text-slate-400" />
+              </button>
+            )}
+          </form>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading ? (
+            <Loading />
+          ) : displayed.length === 0 ? (
+            <Empty folder={currentFolder.label} />
+          ) : (
+            displayed.map((item) => {
+              const unread = item.labels.includes("UNREAD");
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => open(item)}
+                  className={cn(
+                    "w-full border-b border-slate-100 px-4 py-4 text-left transition hover:bg-slate-50",
+                    unread && "bg-gold-50/30",
+                  )}
+                >
+                  <div className="flex gap-3">
+                    <div
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                        unread
+                          ? "bg-navy-900 text-white"
+                          : "bg-slate-100 text-slate-500",
+                      )}
+                    >
+                      {initials(folder === "sent" ? item.to : item.from)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={cn(
+                            "min-w-0 flex-1 truncate text-sm text-navy-950",
+                            unread ? "font-bold" : "font-semibold",
+                          )}
+                        >
+                          {sender(folder === "sent" ? item.to : item.from)}
+                        </p>
+                        <span className="shrink-0 text-[11px] text-slate-400">
+                          {shortDate(item.date || item.internalDate)}
+                        </span>
+                      </div>
+                      <p
+                        className={cn(
+                          "mt-1 truncate text-sm",
+                          unread
+                            ? "font-semibold text-slate-800"
+                            : "text-slate-600",
+                        )}
+                      >
+                        {item.subject}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
+                        {item.snippet}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+        <footer className="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-xs text-slate-400">
+          <span>Page {pageTokens.length + 1}</span>
+          <div className="flex gap-1">
+            <button
+              disabled={!pageTokens.length}
+              onClick={() => {
+                const tokens = pageTokens.slice(0, -1);
+                setPageTokens(tokens);
+                void load(tokens.at(-1) || "");
+              }}
+              className="rounded-lg p-2 hover:bg-slate-100 disabled:opacity-30"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              disabled={!nextPage}
+              onClick={() => {
+                setPageTokens((v) => [...v, nextPage!]);
+                void load(nextPage!);
+              }}
+              className="rounded-lg p-2 hover:bg-slate-100 disabled:opacity-30"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </footer>
+      </section>
 
-  return <div className="relative flex h-[calc(100dvh-7.5rem)] min-h-[620px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <aside className={cn('absolute inset-y-0 left-0 z-30 w-64 border-r bg-white p-4 transition-transform lg:static lg:translate-x-0',mobileFolders?'translate-x-0':'-translate-x-full')}>
-      <div className="mb-5 flex items-center justify-between px-1"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[.18em] text-gold-600">Messagerie</p><p className="mt-1 truncate text-xs text-slate-500">{email}</p></div><button className="rounded-lg p-2 text-slate-400 lg:hidden" onClick={()=>setMobileFolders(false)}><X className="h-5 w-5"/></button></div>
-      <button className="btn btn-primary mb-5 w-full justify-center" onClick={()=>{fresh();setMobileFolders(false)}}><PenLine className="h-4 w-4"/>Nouveau message</button>
-      <nav className="space-y-1">{folders.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>{setFolder(item.id);setMobileFolders(false)}} className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',folder===item.id?'bg-navy-950 text-white shadow-sm':'text-slate-600 hover:bg-slate-100 hover:text-navy-950')}><Icon className={cn('h-4 w-4',folder===item.id?'text-gold-400':'text-slate-400')}/>{item.label}</button>})}</nav>
-      <div className="absolute bottom-4 left-4 right-4 border-t pt-4"><button className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs text-slate-500 hover:bg-slate-50" onClick={disconnect}><Unplug className="h-4 w-4"/>Déconnecter Gmail</button></div>
-    </aside>{mobileFolders&&<button aria-label="Fermer le menu" className="absolute inset-0 z-20 bg-navy-950/25 lg:hidden" onClick={()=>setMobileFolders(false)}/>} 
+      <section
+        className={cn(
+          "min-w-0 flex-1 flex-col bg-slate-50/40",
+          selected ? "flex" : "hidden lg:flex",
+        )}
+      >
+        {detailLoading ? (
+          <Loading />
+        ) : selected ? (
+          <MessageView
+            message={selected}
+            onBack={() => setSelected(null)}
+            onReply={reply}
+            onAction={act}
+          />
+        ) : (
+          <Welcome />
+        )}
+      </section>
+      {compose && (
+        <Compose
+          draft={draft}
+          setDraft={setDraft}
+          sending={sending}
+          onClose={() => setCompose(false)}
+          onSend={sendMail}
+        />
+      )}
+    </div>
+  );
+}
 
-    <section className={cn('w-full shrink-0 border-r lg:w-[390px] xl:w-[430px]',selected&&'hidden lg:block')}>
-      <header className="border-b p-4"><div className="flex items-center gap-3"><button className="rounded-lg border p-2 text-slate-500 lg:hidden" onClick={()=>setMobileFolders(true)}><Menu className="h-4 w-4"/></button><div className="min-w-0 flex-1"><h1 className="truncate text-base font-bold text-navy-950">{folderLabel}</h1><p className="text-xs text-slate-400">Page {page+1}</p></div><button title="Actualiser" className="rounded-lg border p-2 text-slate-500 hover:bg-slate-50" onClick={()=>void load(tokens[page])}><RefreshCw className={cn('h-4 w-4',loading&&'animate-spin')}/></button></div><form className="relative mt-3" onSubmit={search}><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={event=>setQuery(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-gold-400 focus:bg-white" placeholder="Rechercher un e-mail"/></form></header>
-      <div className="h-[calc(100%-9rem)] overflow-y-auto">{messages.map(message=>{const correspondent=folder==='sent'?message.to:message.from;return <button key={message.id} onClick={()=>void open(message.id)} className={cn('flex w-full gap-3 border-b border-slate-100 p-4 text-left transition hover:bg-slate-50',selected?.id===message.id&&'bg-gold-50/70',message.unread&&'bg-blue-50/40')}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-950 text-xs font-bold text-white">{initials(correspondent)}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className={cn('flex-1 truncate text-sm text-navy-950',message.unread?'font-bold':'font-semibold')}>{cleanName(correspondent)}</span><span className="shrink-0 text-[11px] text-slate-400">{shortDate(message.date)}</span></span><span className={cn('mt-1 block truncate text-sm text-slate-700',message.unread&&'font-semibold')}>{message.subject||'(Sans objet)'}</span><span className="mt-1 block truncate text-xs text-slate-400">{message.snippet}</span></span>{message.labels?.includes('STARRED')&&<Star className="mt-7 h-3.5 w-3.5 shrink-0 fill-gold-400 text-gold-500"/>}</button>})}{!messages.length&&!loading&&<div className="flex h-64 flex-col items-center justify-center px-6 text-center"><Mail className="h-8 w-8 text-slate-300"/><p className="mt-3 text-sm font-medium text-slate-500">Aucun message</p><p className="mt-1 text-xs text-slate-400">Ce dossier est vide ou aucun résultat ne correspond.</p></div>}{loading&&!messages.length&&<div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-gold-500"/></div>}</div>
-      <footer className="flex h-14 items-center justify-between border-t px-4 text-xs text-slate-400"><span>{messages.length} message{messages.length>1?'s':''}</span><span className="flex gap-2"><button disabled={page===0} onClick={()=>{const index=page-1;setPage(index);setSelected(null);void load(tokens[index])}} className="rounded-lg border p-2 disabled:opacity-30"><ChevronLeft className="h-4 w-4"/></button><button disabled={!nextToken} onClick={()=>{const next=[...tokens.slice(0,page+1),nextToken];setTokens(next);setPage(page+1);setSelected(null);void load(nextToken)}} className="rounded-lg border p-2 disabled:opacity-30"><ChevronRight className="h-4 w-4"/></button></span></footer>
-    </section>
-
-    <main className={cn('min-w-0 flex-1',!selected&&'hidden lg:block')}>{selected?<div className="flex h-full flex-col"><header className="flex flex-wrap items-center gap-2 border-b p-4"><button className="mr-1 rounded-lg border p-2 text-slate-500 lg:hidden" onClick={()=>setSelected(null)}><ChevronLeft className="h-4 w-4"/></button><button className="btn btn-secondary" onClick={reply}><Reply className="h-4 w-4"/>Répondre</button><button title="Suivre" className="rounded-lg border p-2 text-slate-500" onClick={()=>void act(selected.labels?.includes('STARRED')?'unstar':'star')}><Star className={cn('h-4 w-4',selected.labels?.includes('STARRED')&&'fill-gold-400 text-gold-500')}/></button><button title="Marquer comme non lu" className="rounded-lg border p-2 text-slate-500" onClick={()=>void act('unread')}><Mail className="h-4 w-4"/></button><button title={folder==='trash'?'Restaurer':'Corbeille'} className="rounded-lg border p-2 text-slate-500" onClick={()=>void act(folder==='trash'?'restore':'trash')}>{folder==='trash'?<ArchiveRestore className="h-4 w-4"/>:<Trash2 className="h-4 w-4"/>}</button></header><article className="flex-1 overflow-y-auto p-5 sm:p-7"><h2 className="text-xl font-bold leading-snug text-navy-950">{selected.subject||'(Sans objet)'}</h2><div className="mt-5 flex gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-950 text-xs font-bold text-white">{initials(selected.from)}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-navy-950">{cleanName(selected.from)}</p><p className="truncate text-xs text-slate-500">De : {selected.from}</p><p className="truncate text-xs text-slate-400">À : {selected.to}</p></div><time className="ml-auto shrink-0 text-xs text-slate-400">{shortDate(selected.date)}</time></div><div className="my-6 border-t"/><pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-slate-700">{selected.body||'Ce message ne contient aucun texte.'}</pre></article></div>:<div className="flex h-full flex-col items-center justify-center px-8 text-center"><span className="rounded-2xl bg-slate-100 p-5"><MailOpen className="h-9 w-9 text-slate-400"/></span><h2 className="mt-5 font-bold text-navy-950">Votre messagerie professionnelle</h2><p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Sélectionnez un message pour le consulter, le suivre ou y répondre directement depuis le CRM.</p></div>}</main>
-
-    {compose&&<div className="fixed inset-0 z-[90] flex items-end justify-end bg-navy-950/30 p-0 sm:p-6"><div className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-2xl"><header className="flex items-center justify-between bg-navy-950 px-5 py-4 text-white"><div><h2 className="font-bold">{selected?'Répondre':'Nouveau message'}</h2><p className="mt-0.5 text-xs text-white/55">Depuis {email}</p></div><button className="rounded-lg p-1.5 hover:bg-white/10" onClick={()=>setCompose(false)}><X className="h-5 w-5"/></button></header><div className="flex-1 space-y-3 overflow-y-auto p-5"><input className="input" placeholder="Destinataire" value={to} onChange={event=>setTo(event.target.value)}/><input className="input" placeholder="Objet" value={subject} onChange={event=>setSubject(event.target.value)}/><textarea className="input min-h-64 resize-y" placeholder="Rédigez votre message…" value={body} onChange={event=>setBody(event.target.value)}/>{attachments.length>0&&<div className="flex flex-wrap gap-2">{attachments.map((file,index)=><span key={`${file.name}-${index}`} className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600"><Paperclip className="h-3 w-3"/>{file.name}<button onClick={()=>setAttachments(items=>items.filter((_,i)=>i!==index))}><X className="h-3 w-3"/></button></span>)}</div>}</div><footer className="flex items-center justify-between border-t p-4"><label className="cursor-pointer rounded-lg border p-2.5 text-slate-500 hover:bg-slate-50"><Paperclip className="h-4 w-4"/><input type="file" multiple className="hidden" onChange={event=>void chooseFiles(event.target.files)}/></label><button disabled={loading} onClick={send} className="btn btn-primary"><Send className="h-4 w-4"/>{loading?'Envoi…':'Envoyer'}</button></footer></div></div>}
-  </div>
+function ConnectScreen() {
+  return (
+    <div className="mx-auto flex min-h-[560px] max-w-4xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="max-w-md text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-navy-900 text-gold-400">
+          <Mail className="h-8 w-8" />
+        </div>
+        <h1 className="mt-6 text-2xl font-bold text-navy-950">
+          Votre messagerie professionnelle
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          Consultez, recherchez et répondez à vos e-mails Google Workspace sans
+          quitter le CRM.
+        </p>
+        <a
+          href="/api/email/google/connect"
+          className="mt-7 inline-flex items-center gap-2 rounded-xl bg-gold-400 px-6 py-3 text-sm font-bold text-navy-950 hover:bg-gold-300"
+        >
+          Connecter ma boîte Google
+        </a>
+        <p className="mt-4 text-xs text-slate-400">
+          Chaque utilisateur connecte uniquement sa propre boîte.
+        </p>
+      </div>
+    </div>
+  );
+}
+function Loading() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-12 text-slate-400">
+      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+      Chargement…
+    </div>
+  );
+}
+function Empty({ folder }: { folder: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+      <MailOpen className="h-10 w-10 text-slate-300" />
+      <p className="mt-4 font-semibold text-slate-600">Aucun message</p>
+      <p className="mt-1 text-xs text-slate-400">
+        Le dossier « {folder} » est vide.
+      </p>
+    </div>
+  );
+}
+function Welcome() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center p-10 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-gold-500 shadow-sm ring-1 ring-slate-200">
+        <Mail className="h-7 w-7" />
+      </div>
+      <h2 className="mt-5 text-lg font-bold text-navy-950">
+        Sélectionnez un message
+      </h2>
+      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+        Le contenu du message s’affichera ici pour vous permettre de le traiter
+        sans quitter la liste.
+      </p>
+    </div>
+  );
+}
+function MessageView({
+  message,
+  onBack,
+  onReply,
+  onAction,
+}: {
+  message: Detail;
+  onBack: () => void;
+  onReply: () => void;
+  onAction: (a: string) => void;
+}) {
+  return (
+    <>
+      <header className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Retour</span>
+        </button>
+        <span className="mx-1 h-6 w-px bg-slate-200" />
+        <button
+          onClick={onReply}
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-navy-900 hover:bg-slate-100"
+        >
+          <Reply className="h-4 w-4" />
+          Répondre
+        </button>
+        <div className="ml-auto flex">
+          <button
+            title="Marquer non lu"
+            onClick={() => onAction("unread")}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+          >
+            <Mail className="h-4 w-4" />
+          </button>
+          <button
+            title={
+              message.labels.includes("STARRED") ? "Retirer le suivi" : "Suivre"
+            }
+            onClick={() =>
+              onAction(message.labels.includes("STARRED") ? "unstar" : "star")
+            }
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+          >
+            <Star
+              className={cn(
+                "h-4 w-4",
+                message.labels.includes("STARRED") &&
+                  "fill-gold-400 text-gold-400",
+              )}
+            />
+          </button>
+          <button
+            title="Supprimer"
+            onClick={() =>
+              onAction(message.labels.includes("TRASH") ? "restore" : "trash")
+            }
+            className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
+          >
+            {message.labels.includes("TRASH") ? (
+              <Archive className="h-4 w-4" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </button>
+          <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100">
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-7">
+        <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-5 sm:p-7">
+            <h2 className="text-xl font-bold leading-snug text-navy-950 sm:text-2xl">
+              {message.subject}
+            </h2>
+            <div className="mt-5 flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-white">
+                {initials(message.from)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-navy-950">
+                  {sender(message.from)}
+                </p>
+                <p className="truncate text-xs text-slate-400">
+                  À : {message.to}
+                </p>
+              </div>
+              <time className="shrink-0 text-xs text-slate-400">
+                {new Date(message.date).toLocaleString("fr-FR", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </time>
+            </div>
+          </div>
+          <div className="min-h-[300px] p-5 text-sm leading-7 text-slate-700 sm:p-7">
+            {message.html ? (
+              <iframe
+                sandbox=""
+                title="Contenu du message"
+                srcDoc={message.html}
+                className="min-h-[420px] w-full border-0 bg-white"
+              />
+            ) : (
+              <div className="whitespace-pre-wrap">
+                {message.text || message.snippet}
+              </div>
+            )}
+          </div>
+          <div className="border-t border-slate-100 p-5">
+            <button
+              onClick={onReply}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-navy-900 hover:bg-slate-50"
+            >
+              <Reply className="h-4 w-4" />
+              Répondre
+            </button>
+          </div>
+        </article>
+      </div>
+    </>
+  );
+}
+function Compose({
+  draft,
+  setDraft,
+  sending,
+  onClose,
+  onSend,
+}: {
+  draft: { to: string; cc: string; subject: string; body: string };
+  setDraft: (v: any) => void;
+  sending: boolean;
+  onClose: () => void;
+  onSend: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end justify-end bg-navy-950/25 p-0 sm:p-5">
+      <div className="flex h-[min(720px,92dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <header className="flex items-center justify-between bg-navy-900 px-5 py-4 text-white">
+          <div>
+            <h2 className="font-bold">Nouveau message</h2>
+            <p className="text-xs text-white/50">Messagerie IM Énergie</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 hover:bg-white/10"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto p-5">
+          <label className="block border-b border-slate-200 py-2 text-xs font-semibold text-slate-400">
+            À
+            <input
+              autoFocus
+              value={draft.to}
+              onChange={(e) => setDraft({ ...draft, to: e.target.value })}
+              className="ml-4 w-[calc(100%-3rem)] text-sm font-medium text-slate-800 outline-none"
+              placeholder="client@entreprise.com"
+            />
+          </label>
+          <label className="block border-b border-slate-200 py-2 text-xs font-semibold text-slate-400">
+            Cc
+            <input
+              value={draft.cc}
+              onChange={(e) => setDraft({ ...draft, cc: e.target.value })}
+              className="ml-4 w-[calc(100%-3rem)] text-sm text-slate-800 outline-none"
+            />
+          </label>
+          <input
+            value={draft.subject}
+            onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+            className="w-full border-b border-slate-200 py-4 text-sm font-semibold outline-none"
+            placeholder="Objet"
+          />
+          <textarea
+            value={draft.body}
+            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+            className="min-h-[330px] w-full resize-none py-5 text-sm leading-6 outline-none"
+            placeholder="Rédigez votre message…"
+          />
+        </div>
+        <footer className="flex items-center gap-3 border-t border-slate-200 px-5 py-4">
+          <button
+            onClick={onSend}
+            disabled={sending}
+            className="inline-flex items-center gap-2 rounded-xl bg-gold-400 px-6 py-2.5 text-sm font-bold text-navy-950 hover:bg-gold-300 disabled:opacity-60"
+          >
+            {sending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Envoyer
+          </button>
+          <button
+            title="Pièce jointe — prochaine version"
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
+          <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
+            <Check className="h-3.5 w-3.5" />
+            Connexion sécurisée
+          </span>
+        </footer>
+      </div>
+    </div>
+  );
 }
