@@ -81,9 +81,13 @@ const shortDate = (value: string) => {
 export default function MailboxClient({
   connected,
   email,
+  initialTo = "",
+  initialLeadId = "",
 }: {
   connected: boolean;
-  email: string;
+  email?: string;
+  initialTo?: string;
+  initialLeadId?: string;
 }) {
   const [folder, setFolder] = useState<Folder>("inbox"),
     [messages, setMessages] = useState<Summary[]>([]),
@@ -92,11 +96,16 @@ export default function MailboxClient({
     [detailLoading, setDetailLoading] = useState(false),
     [search, setSearch] = useState(""),
     [query, setQuery] = useState("");
-  const [compose, setCompose] = useState(false),
+  const [compose, setCompose] = useState(Boolean(initialTo)),
     [mobileFolders, setMobileFolders] = useState(false),
     [nextPage, setNextPage] = useState<string | null>(null),
     [pageTokens, setPageTokens] = useState<string[]>([]);
-  const [draft, setDraft] = useState({ to: "", cc: "", subject: "", body: "" }),
+  const [draft, setDraft] = useState({
+      to: initialTo,
+      cc: "",
+      subject: "",
+      body: "",
+    }),
     [sending, setSending] = useState(false);
   const currentFolder = folders.find((item) => item.key === folder)!;
 
@@ -186,13 +195,14 @@ export default function MailboxClient({
           ...draft,
           threadId: selected?.threadId,
           replyToMessageId: selected?.messageId,
+          leadId: initialLeadId || undefined,
         }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       toast.success("Message envoyé");
       setCompose(false);
-      setDraft({ to: "", cc: "", subject: "", body: "" });
+      setDraft({ to: initialTo, cc: "", subject: "", body: "" });
       if (folder === "sent") void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Envoi impossible");
