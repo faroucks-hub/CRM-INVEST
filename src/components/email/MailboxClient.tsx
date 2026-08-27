@@ -32,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "starred" | "important" | "sent" | "drafts" | "trash";
@@ -57,7 +58,7 @@ type Detail = Summary & {
 type Attachment = { name: string; type: string; data: string; size: number };
 type Draft = { to: string; cc: string; subject: string; body: string; importance: "normal" | "high"; attachments: Attachment[] };
 type ComposeFont = "sans" | "century-gothic" | "serif" | "mono";
-type Preferences = { signature: string; signatureEnabled: boolean; replySignature: string; replySignatureEnabled: boolean; font: ComposeFont };
+type Preferences = { signature: string; signatureEnabled: boolean; replySignature: string; replySignatureEnabled: boolean; logoEnabled: boolean; suggestedSignature: string; font: ComposeFont };
 const folders: { key: Folder; label: string; icon: typeof Inbox }[] = [
   { key: "inbox", label: "Boîte de réception", icon: Inbox },
   { key: "starred", label: "Suivis", icon: Star },
@@ -95,7 +96,11 @@ const shortDate = (value: string) => {
 const compactBody = (value: string) => value.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const textToHtml = (value: string) => escapeHtml(value).replace(/\n/g, "<br>");
-const signatureHtml = (value: string, enabled: boolean) => enabled && value.trim() ? `<br><br>${textToHtml(value.trim())}` : "";
+const signatureHtml = (value: string, enabled: boolean, logoEnabled: boolean) => {
+  if (!enabled || !value.trim()) return "";
+  const logo = logoEnabled ? '<td style="padding-right:14px;vertical-align:top"><img src="https://crm.im-energie.com/images/logo-ime.png" alt="IM Énergie" width="92" style="display:block;width:92px;height:auto;border:0"></td>' : "";
+  return `<br><br><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;color:#10233f"><tr>${logo}<td style="vertical-align:top;border-left:2px solid #e2a719;padding-left:14px;font-size:13px;line-height:1.45">${textToHtml(value.trim())}</td></tr></table>`;
+};
 async function responseJson(response: Response) {
   const text = await response.text();
   try { return JSON.parse(text); } catch { throw new Error(`Réponse serveur invalide (${response.status})`); }
@@ -125,7 +130,7 @@ export default function MailboxClient({
     [sort, setSort] = useState<"newest" | "oldest" | "sender" | "unread">("newest"),
     [nextPage, setNextPage] = useState<string | null>(null),
     [pageTokens, setPageTokens] = useState<string[]>([]);
-  const [preferences, setPreferences] = useState<Preferences>({ signature: "", signatureEnabled: true, replySignature: "", replySignatureEnabled: true, font: "sans" });
+  const [preferences, setPreferences] = useState<Preferences>({ signature: "", signatureEnabled: true, replySignature: "", replySignatureEnabled: true, logoEnabled: true, suggestedSignature: "", font: "sans" });
   const [draft, setDraft] = useState<Draft>({
       to: initialTo,
       cc: "",
@@ -139,12 +144,12 @@ export default function MailboxClient({
 
   useEffect(() => {
     if (!connected) return;
-    void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", signatureEnabled: data.signatureEnabled !== false, replySignature: data.replySignature || "", replySignatureEnabled: data.replySignatureEnabled !== false, font: data.font || "sans" })).catch(() => undefined);
+    void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", signatureEnabled: data.signatureEnabled !== false, replySignature: data.replySignature || "", replySignatureEnabled: data.replySignatureEnabled !== false, logoEnabled: data.logoEnabled !== false, suggestedSignature: data.suggestedSignature || "", font: data.font || "sans" })).catch(() => undefined);
   }, [connected]);
 
   const newMessage = () => {
     setSelected(null);
-    setDraft({ to: initialTo, cc: "", subject: "", body: signatureHtml(preferences.signature, preferences.signatureEnabled), importance: "normal", attachments: [] });
+    setDraft({ to: initialTo, cc: "", subject: "", body: signatureHtml(preferences.signature, preferences.signatureEnabled, preferences.logoEnabled), importance: "normal", attachments: [] });
     setCompose(true);
   };
 
@@ -219,7 +224,7 @@ export default function MailboxClient({
       subject: selected.subject.startsWith("Re:")
         ? selected.subject
         : `Re: ${selected.subject}`,
-      body: `${signatureHtml(preferences.replySignature || preferences.signature, preferences.replySignatureEnabled)}<br><br><hr><p><strong>Message précédent</strong></p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>`,
+      body: `${signatureHtml(preferences.replySignature || preferences.signature, preferences.replySignatureEnabled, preferences.logoEnabled)}<br><br><hr><p><strong>Message précédent</strong></p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>`,
       importance: "normal",
       attachments: [],
     });
@@ -231,7 +236,7 @@ export default function MailboxClient({
       to: address(selected.from),
       cc: [selected.to, selected.cc].filter(Boolean).join(", "),
       subject: selected.subject.startsWith("Re:") ? selected.subject : `Re: ${selected.subject}`,
-      body: `${signatureHtml(preferences.replySignature || preferences.signature, preferences.replySignatureEnabled)}<br><br><hr><p><strong>Message précédent</strong></p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>`,
+      body: `${signatureHtml(preferences.replySignature || preferences.signature, preferences.replySignatureEnabled, preferences.logoEnabled)}<br><br><hr><p><strong>Message précédent</strong></p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>`,
       importance: "normal",
       attachments: [],
     });
@@ -243,7 +248,7 @@ export default function MailboxClient({
       to: "",
       cc: "",
       subject: selected.subject.startsWith("Tr:") ? selected.subject : `Tr: ${selected.subject}`,
-      body: `<br><br><hr><p><strong>Message transféré</strong><br>De : ${escapeHtml(selected.from)}<br>Date : ${escapeHtml(selected.date)}<br>Objet : ${escapeHtml(selected.subject)}</p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>${signatureHtml(preferences.signature, preferences.signatureEnabled)}`,
+      body: `<br><br><hr><p><strong>Message transféré</strong><br>De : ${escapeHtml(selected.from)}<br>Date : ${escapeHtml(selected.date)}<br>Objet : ${escapeHtml(selected.subject)}</p><p>${textToHtml(compactBody(selected.text || selected.snippet))}</p>${signatureHtml(preferences.signature, preferences.signatureEnabled, preferences.logoEnabled)}`,
       importance: "normal",
       attachments: [],
     });
@@ -918,10 +923,12 @@ function SettingsPanel({ email, value, onChange, onClose }: { email: string; val
       <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><div className="min-w-0"><h2 className="font-bold text-navy-950">Signature et rédaction</h2><p className="mt-1 truncate text-xs text-slate-400">Préférences personnelles pour {email}</p></div><button onClick={onClose} className="ml-3 rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5"/></button></header>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
         <label className="block"><span className="text-sm font-semibold text-slate-700">Police de rédaction</span><select value={draft.font} onChange={(e) => setDraft({ ...draft, font: e.target.value as Preferences["font"] })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-gold-400"><option value="sans">Sans serif — recommandée</option><option value="century-gothic">Century Gothic</option><option value="serif">Serif</option><option value="mono">Monospace</option></select><span className="mt-1 block text-xs text-slate-400">Arial est utilisée en repli si Century Gothic n’est pas installée.</span></label>
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3"><div><p className="text-sm font-semibold text-slate-700">Logo officiel IM Énergie</p><p className="mt-0.5 text-xs text-slate-400">Dimensionné automatiquement dans la signature.</p></div><button type="button" role="switch" aria-checked={draft.logoEnabled} onClick={() => setDraft({ ...draft, logoEnabled: !draft.logoEnabled })} className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", draft.logoEnabled ? "bg-gold-400" : "bg-slate-300")}><span className={cn("absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform", draft.logoEnabled ? "left-6" : "left-1")} /></button></div>
+        {draft.suggestedSignature && <button type="button" onClick={() => setDraft({ ...draft, signature: draft.suggestedSignature, replySignature: draft.suggestedSignature, signatureEnabled: true, replySignatureEnabled: true })} className="w-full rounded-xl border border-gold-300 bg-gold-50 px-4 py-2.5 text-sm font-semibold text-navy-900 hover:bg-gold-100">Créer la signature standard IM Énergie</button>}
         <SignatureField label="Signature — nouveaux messages" enabled={draft.signatureEnabled} value={draft.signature} onEnabled={(signatureEnabled) => setDraft({ ...draft, signatureEnabled })} onValue={(signature) => setDraft({ ...draft, signature })} />
         <div className="flex justify-end"><button type="button" onClick={() => setDraft({ ...draft, replySignature: draft.signature, replySignatureEnabled: draft.signatureEnabled })} disabled={!draft.signature.trim()} className="text-xs font-semibold text-navy-800 hover:text-gold-600 disabled:cursor-not-allowed disabled:text-slate-300">Utiliser la même signature pour les réponses</button></div>
         <SignatureField label="Signature — réponses et transferts" enabled={draft.replySignatureEnabled} value={draft.replySignature} onEnabled={(replySignatureEnabled) => setDraft({ ...draft, replySignatureEnabled })} onValue={(replySignature) => setDraft({ ...draft, replySignature })} />
-        {preview.trim() && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Aperçu</p><div className={cn("whitespace-pre-line text-sm leading-5 text-slate-700", previewClass)} style={previewStyle}>{preview}</div></div>}
+        {preview.trim() && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Aperçu</p><div className="flex items-start gap-3">{draft.logoEnabled && <Image src="/images/logo-ime.png" alt="IM Énergie" width={92} height={58} className="h-auto w-[92px] shrink-0" />}<div className={cn("whitespace-pre-line border-l-2 border-gold-400 pl-3 text-sm leading-5 text-slate-700", previewClass)} style={previewStyle}>{preview}</div></div></div>}
       </div>
       <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4"><button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button><button onClick={() => void save()} disabled={saving} className="rounded-xl bg-navy-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-navy-800 disabled:opacity-60">{saving ? "Enregistrement…" : "Enregistrer"}</button></footer>
     </div>
