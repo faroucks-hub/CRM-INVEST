@@ -65,9 +65,12 @@ export function extractBody(part: any): string {
   return ''
 }
 
-export function encodeMessage({ from, to, subject, body, inReplyTo, references, attachments = [] }: { from: string; to: string; subject: string; body: string; inReplyTo?: string; references?: string; attachments?: Array<{ name:string; type:string; data:string }> }) {
+export function encodeMessage({ from, to, cc, subject, body, inReplyTo, references, importance = 'normal', attachments = [] }: { from: string; to: string; cc?: string; subject: string; body: string; inReplyTo?: string; references?: string; importance?: 'normal'|'high'; attachments?: Array<{ name:string; type:string; data:string }> }) {
   const boundary = `ime_${Date.now().toString(36)}`
-  const lines = [`From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`, 'MIME-Version: 1.0']
+  const lines = [`From: ${from}`, `To: ${to}`]
+  if (cc) lines.push(`Cc: ${cc}`)
+  lines.push(`Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`, 'MIME-Version: 1.0')
+  if (importance === 'high') lines.push('Importance: high', 'Priority: urgent', 'X-Priority: 1')
   if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`)
   if (references) lines.push(`References: ${references}`)
   if (!attachments.length) lines.push('Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(body).toString('base64'))

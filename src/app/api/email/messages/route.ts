@@ -58,7 +58,9 @@ export async function POST(request: NextRequest) {
     const attachments = Array.isArray(input.attachments) ? input.attachments.slice(0, 5) : []
     const totalBytes = attachments.reduce((sum:number, file:any) => sum + String(file.data ?? '').length, 0)
     if (totalBytes > 13_000_000) return NextResponse.json({ error: 'Les pièces jointes dépassent 10 Mo' }, { status: 400 })
-    const raw = encodeMessage({ from: account.email_address, to, subject, body, inReplyTo: input.inReplyTo, references: input.references, attachments })
+    const cc = String(input.cc ?? '').trim()
+    const importance = input.importance === 'high' ? 'high' : 'normal'
+    const raw = encodeMessage({ from: account.email_address, to, cc: cc || undefined, subject, body, inReplyTo: input.inReplyTo, references: input.references, importance, attachments })
     const sent = await (await gmailFetch('/messages/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raw, threadId: input.threadId || undefined }) })).json()
     await supabase.from('email_activity').insert({ user_id: user.id, gmail_message_id: sent.id, gmail_thread_id: sent.threadId, direction: 'outbound', recipient: to, subject, website_lead_id: input.leadId || null })
     if (input.leadId) await supabase.from('email_crm_links').upsert({ user_id: user.id, gmail_thread_id: sent.threadId, website_lead_id: input.leadId }, { onConflict: 'user_id,gmail_thread_id' })
