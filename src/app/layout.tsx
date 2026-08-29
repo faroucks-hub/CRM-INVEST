@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   },
   description: 'IM ÉNERGIE — Système de gestion interne',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon-32x32.png',
     shortcut: '/favicon-32x32.png',
     apple: '/apple-touch-icon.png',
   },
