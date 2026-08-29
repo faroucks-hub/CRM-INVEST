@@ -134,6 +134,14 @@ export default function ClientForm({ client, users = [], role, currentUserId, mo
             <input name="contact_whatsapp" type="tel" className="input"
               defaultValue={client?.contact_whatsapp ?? ''} placeholder="+225 XX XX XX XX" />
           </FormField>
+          <FormField label="Langue de communication">
+            <select name="communication_language" className="input"
+              defaultValue={client?.communication_language ?? 'unknown'}>
+              <option value="unknown">À déterminer au moment de l’envoi</option>
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+            </select>
+          </FormField>
         </div>
       </section>
 

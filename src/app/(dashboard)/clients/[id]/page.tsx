@@ -156,12 +156,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 </div>
                 <div className="space-y-2">
                   {client.contact_email && (
-                    <a href={`mailto:${client.contact_email}`}
+                    <Link href={`/messagerie?${new URLSearchParams({ to: client.contact_email, clientId: client.id, contactName: client.contact_name ?? '', company: client.company_name, language: client.communication_language ?? 'unknown' })}`}
                       className="flex items-center gap-2 text-sm text-blue-600
                                  hover:text-blue-800 transition-colors">
                       <Mail className="w-4 h-4 flex-shrink-0" />
                       {client.contact_email}
-                    </a>
+                    </Link>
                   )}
                   {client.contact_phone && (
                     <a href={`tel:${client.contact_phone}`}

@@ -124,11 +124,11 @@ export default function ClientsTable({ clients, role }: ClientsTableProps) {
                       <span className="text-sm text-gray-900">{client.contact_name}</span>
                       <div className="flex items-center gap-2">
                         {client.contact_email && (
-                          <a href={`mailto:${client.contact_email}`}
+                          <Link href={`/messagerie?${new URLSearchParams({ to: client.contact_email, clientId: client.id, contactName: client.contact_name ?? '', company: client.company_name, language: client.communication_language ?? 'unknown' })}`}
                             className="text-gray-400 hover:text-blue-500 transition-colors"
                             title={client.contact_email}>
                             <Mail className="w-3.5 h-3.5" />
-                          </a>
+                          </Link>
                         )}
                         {client.contact_phone && (
                           <a href={`tel:${client.contact_phone}`}

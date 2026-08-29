@@ -16,7 +16,7 @@ export default async function ClientsPage() {
   let query = supabase
     .from('clients')
     .select(`id, reference, company_name, trade_name, status, country, city, sector,
-      contact_name, contact_email, contact_phone, contact_whatsapp,
+      contact_name, contact_email, contact_phone, contact_whatsapp, communication_language,
       assigned_to, lead_source, currency_pref, notes, tags, is_archived, created_at, updated_at`)
     .eq('is_archived', false)
     .order('created_at', { ascending: false })

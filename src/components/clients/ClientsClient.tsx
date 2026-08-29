@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { Plus, Download, Upload, Filter, X, Phone, Mail, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import DataTable, { type Column } from '@/components/ui/table/DataTable'
@@ -112,11 +113,11 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
           )}
           <div className="flex items-center gap-2 mt-0.5">
             {Boolean(row.contact_email) && (
-              <a href={`mailto:${row.contact_email}`}
+              <Link href={`/messagerie?${new URLSearchParams({ to: String(row.contact_email), clientId: String(row.id), contactName: String(row.contact_name ?? ''), company: String(row.company_name ?? ''), language: String(row.communication_language ?? 'unknown') })}`}
                 onClick={e => e.stopPropagation()}
                 className="text-gray-400 hover:text-navy-900 transition-colors">
                 <Mail className="w-3 h-3" />
-              </a>
+              </Link>
             )}
             {Boolean(row.contact_phone) && (
               <a href={`tel:${row.contact_phone}`}

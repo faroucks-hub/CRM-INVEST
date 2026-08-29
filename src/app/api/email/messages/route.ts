@@ -58,14 +58,19 @@ export async function POST(request: NextRequest) {
     const { account, supabase, user } = await getOwnEmailAccount()
     if (!account || !user) return NextResponse.json({ error: 'Boîte Gmail non connectée' }, { status: 409 })
     const attachments = Array.isArray(input.attachments) ? input.attachments.slice(0, 5) : []
-    const totalBytes = attachments.reduce((sum:number, file:any) => sum + String(file.data ?? '').length, 0)
-    if (totalBytes > 13_000_000) return NextResponse.json({ error: 'Les pièces jointes dépassent 10 Mo' }, { status: 400 })
+    const totalBytes = attachments.reduce((sum:number, file:any) => {
+      const encoded = String(file.data ?? '').replace(/^data:[^,]+,/, '').replace(/\s/g, '')
+      const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0
+      return sum + Math.max(0, Math.floor(encoded.length * 3 / 4) - padding)
+    }, 0)
+    if (totalBytes > 10 * 1024 * 1024) return NextResponse.json({ error: 'Les pièces jointes dépassent 10 Mo' }, { status: 400 })
     const cc = String(input.cc ?? '').trim()
     const importance = input.importance === 'high' ? 'high' : 'normal'
     const raw = encodeMessage({ from: account.email_address, to, cc: cc || undefined, subject, body, inReplyTo: input.inReplyTo, references: input.references, importance, attachments })
     const sent = await (await gmailFetch('/messages/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raw, threadId: input.threadId || undefined }) })).json()
-    await supabase.from('email_activity').insert({ user_id: user.id, gmail_message_id: sent.id, gmail_thread_id: sent.threadId, direction: 'outbound', recipient: to, subject, website_lead_id: input.leadId || null })
+    await supabase.from('email_activity').insert({ user_id: user.id, gmail_message_id: sent.id, gmail_thread_id: sent.threadId, direction: 'outbound', recipient: to, subject, website_lead_id: input.leadId || null, client_id: input.clientId || null })
     if (input.leadId) await supabase.from('email_crm_links').upsert({ user_id: user.id, gmail_thread_id: sent.threadId, website_lead_id: input.leadId }, { onConflict: 'user_id,gmail_thread_id' })
+    if (input.clientId) await supabase.from('email_crm_links').upsert({ user_id: user.id, gmail_thread_id: sent.threadId, client_id: input.clientId }, { onConflict: 'user_id,gmail_thread_id' })
     return NextResponse.json({ success: true, id: sent.id, threadId: sent.threadId })
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Envoi impossible' }, { status: 502 }) }
 }

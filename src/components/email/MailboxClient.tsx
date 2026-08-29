@@ -56,6 +56,7 @@ type Detail = Summary & {
   text: string;
 };
 type Attachment = { name: string; type: string; data: string; size: number };
+type CommunicationLanguage = "fr" | "en" | "unknown";
 type Draft = { to: string; cc: string; subject: string; body: string; importance: "normal" | "high"; attachments: Attachment[] };
 type ComposeFont = "sans" | "century-gothic" | "serif" | "mono";
 type Preferences = { signature: string; signatureEnabled: boolean; replySignature: string; replySignatureEnabled: boolean; logoEnabled: boolean; suggestedSignature: string; font: ComposeFont };
@@ -101,6 +102,22 @@ const signatureHtml = (value: string, enabled: boolean, logoEnabled: boolean) =>
   const logo = logoEnabled ? '<td style="padding-right:14px;vertical-align:top"><img src="https://crm.im-energie.com/images/logo-ime-signature.png" alt="IM Énergie" width="92" style="display:block;width:92px;height:auto;border:0"></td>' : "";
   return `<br><br><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;color:#10233f"><tr>${logo}<td style="vertical-align:top;border-left:2px solid #e2a719;padding-left:14px;font-size:13px;line-height:1.45">${textToHtml(value.trim())}</td></tr></table>`;
 };
+const catalogueByLanguage = {
+  fr: { url: "/catalogues/IM_Energie_Catalogue_International_2027_FR_Email.pdf", name: "IM_Energie_Catalogue_International_2027_FR.pdf" },
+  en: { url: "/catalogues/IM_Energie_General_Catalogue_2027_EN_Email.pdf", name: "IM_Energie_General_Catalogue_2027_EN.pdf" },
+} as const;
+const templateContent = (language: Exclude<CommunicationLanguage, "unknown">, contactName: string, company: string) => {
+  const person = contactName.trim();
+  const organisation = company.trim();
+  if (language === "fr") return {
+    subject: `Présentation d’IM Énergie${organisation ? ` — ${organisation}` : ""}`,
+    body: `<p>${person ? `Bonjour ${escapeHtml(person)},` : "Madame, Monsieur,"}</p><p>Je vous contacte au nom d’IM Énergie, société spécialisée dans l’accompagnement de projets énergétiques industriels et la mise en relation avec des fabricants qualifiés.</p><p>Nous intervenons notamment sur les systèmes UPS industriels, redresseurs et chargeurs, onduleurs, convertisseurs de fréquence, stabilisateurs, solutions solaires et systèmes de stockage d’énergie.</p><p>Vous trouverez en pièce jointe notre catalogue général international 2027. Nous restons disponibles pour étudier vos besoins techniques et vous proposer une approche adaptée à votre projet.</p><p>Cordialement,</p>`,
+  };
+  return {
+    subject: `Introduction to IM Energy${organisation ? ` — ${organisation}` : ""}`,
+    body: `<p>${person ? `Dear ${escapeHtml(person)},` : "Dear Sir or Madam,"}</p><p>I am contacting you on behalf of IM Energy, a company specializing in industrial energy projects and in connecting clients with qualified manufacturers.</p><p>Our scope includes industrial UPS systems, rectifiers and battery chargers, inverters, frequency converters, voltage stabilizers, solar solutions, and energy storage systems.</p><p>Please find attached our 2027 international general catalogue. We would be pleased to review your technical requirements and discuss an approach suited to your project.</p><p>Kind regards,</p>`,
+  };
+};
 async function responseJson(response: Response) {
   const text = await response.text();
   try { return JSON.parse(text); } catch { throw new Error(`Réponse serveur invalide (${response.status})`); }
@@ -111,11 +128,19 @@ export default function MailboxClient({
   email,
   initialTo = "",
   initialLeadId = "",
+  initialClientId = "",
+  initialContactName = "",
+  initialCompany = "",
+  initialLanguage = "unknown",
 }: {
   connected: boolean;
   email?: string;
   initialTo?: string;
   initialLeadId?: string;
+  initialClientId?: string;
+  initialContactName?: string;
+  initialCompany?: string;
+  initialLanguage?: string;
 }) {
   const [folder, setFolder] = useState<Folder>("inbox"),
     [messages, setMessages] = useState<Summary[]>([]),
@@ -131,6 +156,7 @@ export default function MailboxClient({
     [nextPage, setNextPage] = useState<string | null>(null),
     [pageTokens, setPageTokens] = useState<string[]>([]);
   const [preferences, setPreferences] = useState<Preferences>({ signature: "", signatureEnabled: true, replySignature: "", replySignatureEnabled: true, logoEnabled: true, suggestedSignature: "", font: "sans" });
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [draft, setDraft] = useState<Draft>({
       to: initialTo,
       cc: "",
@@ -140,12 +166,52 @@ export default function MailboxClient({
       attachments: [],
     }),
     [sending, setSending] = useState(false);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const initialTemplateApplied = useRef(false);
   const currentFolder = folders.find((item) => item.key === folder)!;
 
   useEffect(() => {
     if (!connected) return;
-    void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", signatureEnabled: data.signatureEnabled !== false, replySignature: data.replySignature || "", replySignatureEnabled: data.replySignatureEnabled !== false, logoEnabled: data.logoEnabled !== false, suggestedSignature: data.suggestedSignature || "", font: data.font || "sans" })).catch(() => undefined);
+    void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", signatureEnabled: data.signatureEnabled !== false, replySignature: data.replySignature || "", replySignatureEnabled: data.replySignatureEnabled !== false, logoEnabled: data.logoEnabled !== false, suggestedSignature: data.suggestedSignature || "", font: data.font || "sans" })).catch(() => undefined).finally(() => setPreferencesLoaded(true));
   }, [connected]);
+
+  const attachCatalogue = useCallback(async (language: Exclude<CommunicationLanguage, "unknown">) => {
+    const catalogue = catalogueByLanguage[language];
+    const response = await fetch(catalogue.url);
+    if (!response.ok) throw new Error("Catalogue indisponible");
+    const blob = await response.blob();
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Lecture du catalogue impossible"));
+      reader.readAsDataURL(blob);
+    });
+    return { name: catalogue.name, type: "application/pdf", data, size: blob.size } satisfies Attachment;
+  }, []);
+
+  const applyTemplate = useCallback(async (language: Exclude<CommunicationLanguage, "unknown">) => {
+    setCatalogueLoading(true);
+    try {
+      const content = templateContent(language, initialContactName, initialCompany);
+      const attachment = await attachCatalogue(language);
+      const manualAttachments = draft.attachments.filter((file) => !Object.values(catalogueByLanguage).some((catalogue) => catalogue.name === file.name));
+      const total = manualAttachments.reduce((sum, file) => sum + file.size, attachment.size);
+      if (total > 10 * 1024 * 1024) throw new Error("Le catalogue et les autres pièces jointes dépassent 10 Mo");
+      setDraft((current) => ({ ...current, subject: content.subject, body: `${content.body}${signatureHtml(preferences.signature, preferences.signatureEnabled, preferences.logoEnabled)}`, attachments: [...manualAttachments, attachment] }));
+      toast.success(language === "fr" ? "Modèle français et catalogue ajoutés" : "English template and catalogue added");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Catalogue indisponible");
+    } finally {
+      setCatalogueLoading(false);
+    }
+  }, [attachCatalogue, draft.attachments, initialCompany, initialContactName, preferences]);
+
+  useEffect(() => {
+    if (!connected || !preferencesLoaded || !initialTo || initialTemplateApplied.current) return;
+    if (initialLanguage !== "fr" && initialLanguage !== "en") return;
+    initialTemplateApplied.current = true;
+    void applyTemplate(initialLanguage);
+  }, [applyTemplate, connected, initialLanguage, initialTo, preferencesLoaded]);
 
   const newMessage = () => {
     setSelected(null);
@@ -266,6 +332,7 @@ export default function MailboxClient({
           threadId: selected?.threadId,
           replyToMessageId: selected?.messageId,
           leadId: initialLeadId || undefined,
+          clientId: initialClientId || undefined,
         }),
       });
       const data = await responseJson(r);
@@ -548,6 +615,8 @@ export default function MailboxClient({
           onClose={() => setCompose(false)}
           onSend={sendMail}
           preferences={preferences}
+          catalogueLoading={catalogueLoading}
+          onApplyTemplate={applyTemplate}
         />
       )}
       {settingsOpen && <SettingsPanel email={email || ""} value={preferences} onChange={setPreferences} onClose={() => setSettingsOpen(false)} />}
@@ -763,6 +832,8 @@ function Compose({
   onClose,
   onSend,
   preferences,
+  catalogueLoading,
+  onApplyTemplate,
 }: {
   draft: Draft;
   setDraft: (v: Draft) => void;
@@ -770,6 +841,8 @@ function Compose({
   onClose: () => void;
   onSend: () => void;
   preferences: Preferences;
+  catalogueLoading: boolean;
+  onApplyTemplate: (language: Exclude<CommunicationLanguage, "unknown">) => Promise<void>;
 }) {
   const addAttachments = async (files: FileList | null) => {
     if (!files) return;
@@ -826,6 +899,15 @@ function Compose({
             className="w-full border-b border-slate-200 py-4 text-sm font-semibold outline-none"
             placeholder="Objet"
           />
+          <div className="border-b border-slate-200 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="mr-1 text-xs font-semibold text-slate-400">Présentation commerciale</span>
+              <button type="button" disabled={catalogueLoading} onClick={() => void onApplyTemplate("fr")} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-gold-400 hover:bg-gold-50 disabled:opacity-50">FR + catalogue</button>
+              <button type="button" disabled={catalogueLoading} onClick={() => void onApplyTemplate("en")} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-gold-400 hover:bg-gold-50 disabled:opacity-50">EN + catalogue</button>
+              {catalogueLoading && <Loader2 className="h-4 w-4 animate-spin text-gold-500" />}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-slate-400">Le modèle remplace l’objet et le corps actuels. Vérifiez toujours le message et la pièce jointe avant l’envoi.</p>
+          </div>
           <div className="flex items-center justify-between border-b border-slate-200 py-2">
             <span className="text-xs font-semibold text-slate-400">Priorité</span>
             <select value={draft.importance} onChange={(e) => setDraft({ ...draft, importance: e.target.value as Draft["importance"] })} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none">
