@@ -16,6 +16,7 @@ import {
 import WebsiteLeadActions from '@/components/website-leads/WebsiteLeadActions'
 import { WebsiteLeadStatusBadge } from '@/components/website-leads/WebsiteLeadStatusBadge'
 import { createClient } from '@/lib/supabase/server'
+import ContactEngagementBadge from '@/components/commercial/ContactEngagementBadge'
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
@@ -79,6 +80,16 @@ export default async function WebsiteLeadDetailPage({
     notFound()
   }
 
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('users_profiles').select('role').eq('id', user!.id).single()
+  const canAssign = profile?.role === 'admin' || profile?.role === 'lead_team'
+  const { data: users } = canAssign
+    ? await supabase.from('users_profiles').select('id, full_name').eq('is_active', true).order('full_name')
+    : { data: [] }
+  const { data: engagement } = lead.email
+    ? await supabase.from('contact_engagements').select('*').eq('email_key', lead.email.trim().toLowerCase()).maybeSingle()
+    : { data: null }
+
   const isConverted = Boolean(lead.converted_opportunity_id || lead.converted_at)
 
   return (
@@ -104,6 +115,7 @@ export default async function WebsiteLeadDetailPage({
                     {lead.full_name || 'Website Lead'}
                   </h1>
                   <WebsiteLeadStatusBadge status={lead.status} />
+                  <ContactEngagementBadge engagement={engagement} blocked={Boolean(lead.do_not_contact)} />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
                   <span className="inline-flex items-center gap-2 font-medium text-slate-700">
@@ -119,7 +131,7 @@ export default async function WebsiteLeadDetailPage({
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-3">
-              {lead.email && <Link href={`/messagerie?to=${encodeURIComponent(lead.email)}&leadId=${lead.id}`} className="btn btn-primary"><Mail className="h-4 w-4" />Répondre par e-mail</Link>}
+              {lead.email && !lead.do_not_contact && <Link href={`/messagerie?to=${encodeURIComponent(lead.email)}&leadId=${lead.id}`} className="btn btn-primary"><Mail className="h-4 w-4" />Répondre par e-mail</Link>}
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Source</p>
                 <p className="mt-1 text-sm font-semibold capitalize text-navy-900">{lead.source || 'website'}</p>
@@ -196,7 +208,7 @@ export default async function WebsiteLeadDetailPage({
             </div>
             <div className="space-y-3">
               <InfoRow icon={Building2} label="Entreprise" value={lead.company} />
-              <InfoRow icon={Mail} label="Email" value={lead.email} href={lead.email ? `mailto:${lead.email}` : undefined} />
+              <InfoRow icon={Mail} label="Email" value={lead.email} href={lead.email && !lead.do_not_contact ? `/messagerie?to=${encodeURIComponent(lead.email)}&leadId=${lead.id}` : undefined} />
               <InfoRow icon={Phone} label="Téléphone" value={lead.phone} href={lead.phone ? `tel:${lead.phone}` : undefined} />
               <InfoRow icon={Globe2} label="Pays" value={lead.country} />
               <InfoRow icon={CalendarDays} label="Date de réception" value={formatDate(lead.created_at)} />
@@ -208,6 +220,10 @@ export default async function WebsiteLeadDetailPage({
             status={lead.status}
             internalNotes={lead.internal_notes}
             isConverted={isConverted}
+            assignedTo={lead.assigned_to}
+            doNotContact={Boolean(lead.do_not_contact)}
+            users={users ?? []}
+            canAssign={canAssign}
           />
         </aside>
       </div>

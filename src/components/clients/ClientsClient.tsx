@@ -12,6 +12,7 @@ import { archiveClientAction } from '@/lib/actions/clients'
 import { exportToCSV, parseCSV } from '@/lib/utils/export'
 import { formatDate } from '@/lib/utils'
 import { CLIENT_STATUS_EXTENDED, LEAD_SOURCE_LABELS } from '@/types/sprint2'
+import ContactEngagementBadge, { type ContactEngagement } from '@/components/commercial/ContactEngagementBadge'
 
 interface Props {
   clients: Record<string, unknown>[]
@@ -43,6 +44,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
   const [filterStatus, setFilterStatus]     = useState('')
   const [filterSector, setFilterSector]     = useState('')
   const [filterAssigned, setFilterAssigned] = useState('')
+  const [filterContact, setFilterContact] = useState('')
   const [showFilters, setShowFilters]       = useState(false)
 
   // Données filtrées
@@ -51,11 +53,17 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       if (filterStatus   && c.status   !== filterStatus)   return false
       if (filterSector   && c.sector   !== filterSector)   return false
       if (filterAssigned && c.assigned_to !== filterAssigned) return false
+      const engagement = c.contact_engagement as ContactEngagement | null
+      if (filterContact === 'unverified' && engagement?.history_checked_at) return false
+      if (filterContact === 'never' && (!engagement?.history_checked_at || Number(engagement.outbound_count ?? 0) > 0)) return false
+      if (filterContact === 'contacted' && Number(engagement?.outbound_count ?? 0) === 0) return false
+      if (filterContact === 'replied' && Number(engagement?.inbound_count ?? 0) === 0) return false
+      if (filterContact === 'blocked' && !c.do_not_contact) return false
       return true
     })
-  }, [clients, filterStatus, filterSector, filterAssigned])
+  }, [clients, filterStatus, filterSector, filterAssigned, filterContact])
 
-  const activeFilters = [filterStatus, filterSector, filterAssigned].filter(Boolean).length
+  const activeFilters = [filterStatus, filterSector, filterAssigned, filterContact].filter(Boolean).length
 
   // Colonnes
   const columns: Column<Record<string, unknown>>[] = [
@@ -139,6 +147,11 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       ),
     },
     {
+      key: 'contact_engagement',
+      header: 'Suivi e-mail',
+      render: row => <ContactEngagementBadge engagement={row.contact_engagement as ContactEngagement | null} blocked={Boolean(row.do_not_contact)} compact />,
+    },
+    {
       key: 'lead_source',
       header: 'Source',
       render: row => row.lead_source
@@ -203,7 +216,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
     setDeleteTarget(null)
   }
 
-  const clearFilters = () => { setFilterStatus(''); setFilterSector(''); setFilterAssigned('') }
+  const clearFilters = () => { setFilterStatus(''); setFilterSector(''); setFilterAssigned(''); setFilterContact('') }
 
   return (
     <div className="max-w-7xl mx-auto space-y-4">
@@ -277,6 +290,17 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
                 </select>
               </div>
             )}
+            <div>
+              <label className="label">Suivi e-mail</label>
+              <select className="input" value={filterContact} onChange={e => setFilterContact(e.target.value)}>
+                <option value="">Tous</option>
+                <option value="unverified">À vérifier</option>
+                <option value="never">Jamais contactés</option>
+                <option value="contacted">Déjà contactés</option>
+                <option value="replied">Réponse reçue</option>
+                <option value="blocked">Ne plus contacter</option>
+              </select>
+            </div>
             {activeFilters > 0 && (
               <div className="flex items-end">
                 <button onClick={clearFilters} className="btn btn-ghost btn-sm w-full">

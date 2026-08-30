@@ -14,6 +14,15 @@ export default async function WebsiteLeadsPage() {
     .from('website_leads')
     .select('*')
     .order('created_at', { ascending: false })
+  const emails = [...new Set((leads ?? []).map(lead => lead.email?.trim().toLowerCase()).filter(Boolean))] as string[]
+  const { data: engagements } = emails.length
+    ? await supabase.from('contact_engagements').select('*').in('email_key', emails)
+    : { data: [] }
+  const engagementByEmail = new Map((engagements ?? []).map(item => [item.email_key, item]))
+  const leadsWithEngagement = (leads ?? []).map(lead => ({
+    ...lead,
+    contact_engagement: lead.email ? engagementByEmail.get(lead.email.trim().toLowerCase()) ?? null : null,
+  }))
 
   return (
     <div className="space-y-6">
@@ -27,7 +36,7 @@ export default async function WebsiteLeadsPage() {
           Impossible de charger les leads : {error.message}
         </div>
       ) : (
-        <WebsiteLeadsClient leads={leads ?? []} />
+        <WebsiteLeadsClient leads={leadsWithEngagement} />
       )}
     </div>
   )

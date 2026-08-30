@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Pencil, Mail, Phone, MessageCircle, Globe, Building2 } from 'lucide-react'
 import { Badge } from '@/components/ui'
 import { PageHeader } from '@/components/ui/page-header'
+import ContactEngagementBadge from '@/components/commercial/ContactEngagementBadge'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import {
   CLIENT_STATUS_LABELS, CLIENT_STATUS_COLORS,
@@ -37,6 +38,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   if (error || !client) notFound()
 
+  const { data: engagement } = client.contact_email
+    ? await supabase.from('contact_engagements').select('*').eq('email_key', client.contact_email.trim().toLowerCase()).maybeSingle()
+    : { data: null }
+
   // Opportunités liées
   const { data: opps } = await supabase
     .from('opportunities')
@@ -62,6 +67,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           )}>
             {CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS]}
           </Badge>
+          <ContactEngagementBadge engagement={engagement} blocked={Boolean(client.do_not_contact)} />
         </div>
         <Link href={`/clients/${id}/modifier`} className="btn btn-outline btn-sm">
           <Pencil className="w-3.5 h-3.5" />
@@ -157,7 +163,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                   )}
                 </div>
                 <div className="space-y-2">
-                  {client.contact_email && (
+                  {client.contact_email && !client.do_not_contact && (
                     <Link href={`/messagerie?${new URLSearchParams({ to: client.contact_email, clientId: client.id, contactName: client.contact_name ?? '', company: client.company_name, language: client.communication_language ?? 'unknown', market: client.communication_market ?? 'unknown' })}`}
                       className="flex items-center gap-2 text-sm text-blue-600
                                  hover:text-blue-800 transition-colors">

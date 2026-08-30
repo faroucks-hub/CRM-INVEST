@@ -16,6 +16,8 @@ export interface TaskPayload {
   client_id?:   string
   project_id?:  string
   quotation_id?: string
+  website_lead_id?: string
+  task_type?: 'general' | 'follow_up' | 'call' | 'meeting'
   remind_at?:   string
   notes?:       string
 }
@@ -40,6 +42,8 @@ export async function createTaskAction(data: TaskPayload) {
       client_id:    data.client_id    || null,
       project_id:   data.project_id   || null,
       quotation_id: data.quotation_id || null,
+      website_lead_id: data.website_lead_id || null,
+      task_type: data.task_type || 'general',
       notes:        data.notes || null,
     })
     .select().single()

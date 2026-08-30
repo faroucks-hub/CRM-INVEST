@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { Search, Mail, Phone } from 'lucide-react'
 import { WebsiteLeadStatusBadge, WEBSITE_LEAD_STATUS_OPTIONS } from './WebsiteLeadStatusBadge'
+import ContactEngagementBadge, { type ContactEngagement } from '@/components/commercial/ContactEngagementBadge'
 
 type WebsiteLead = {
   id: string
@@ -16,6 +17,8 @@ type WebsiteLead = {
   message: string | null
   source: string | null
   status: string | null
+  do_not_contact: boolean
+  contact_engagement?: ContactEngagement | null
 }
 
 export default function WebsiteLeadsClient({
@@ -25,12 +28,20 @@ export default function WebsiteLeadsClient({
 }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
+  const [contactStatus, setContactStatus] = useState('')
 
   const filteredLeads = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
 
     return leads.filter((lead) => {
       const matchesStatus = !status || (lead.status || 'new') === status
+      const engagement = lead.contact_engagement
+      const matchesContact = !contactStatus
+        || (contactStatus === 'unverified' && !engagement?.history_checked_at)
+        || (contactStatus === 'never' && Boolean(engagement?.history_checked_at) && Number(engagement?.outbound_count ?? 0) === 0)
+        || (contactStatus === 'contacted' && Number(engagement?.outbound_count ?? 0) > 0)
+        || (contactStatus === 'replied' && Number(engagement?.inbound_count ?? 0) > 0)
+        || (contactStatus === 'blocked' && lead.do_not_contact)
 
       const searchable = [
         lead.full_name,
@@ -46,13 +57,13 @@ export default function WebsiteLeadsClient({
 
       const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery)
 
-      return matchesStatus && matchesQuery
+      return matchesStatus && matchesContact && matchesQuery
     })
-  }, [leads, query, status])
+  }, [leads, query, status, contactStatus])
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-xl border bg-white p-4 md:grid-cols-[1fr_220px]">
+      <div className="grid gap-3 rounded-xl border bg-white p-4 md:grid-cols-[1fr_200px_200px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -76,6 +87,14 @@ export default function WebsiteLeadsClient({
             </option>
           ))}
         </select>
+        <select value={contactStatus} onChange={(event) => setContactStatus(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20">
+          <option value="">Tous les suivis</option>
+          <option value="unverified">À vérifier</option>
+          <option value="never">Jamais contactés</option>
+          <option value="contacted">Déjà contactés</option>
+          <option value="replied">Réponse reçue</option>
+          <option value="blocked">Ne plus contacter</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-white">
@@ -88,6 +107,7 @@ export default function WebsiteLeadsClient({
               <th className="p-3">Pays</th>
               <th className="p-3">Source</th>
               <th className="p-3">Statut</th>
+              <th className="p-3">Suivi e-mail</th>
             </tr>
           </thead>
 
@@ -130,12 +150,13 @@ export default function WebsiteLeadsClient({
                 <td className="p-3">
                   <WebsiteLeadStatusBadge status={lead.status} />
                 </td>
+                <td className="p-3"><ContactEngagementBadge engagement={lead.contact_engagement} blocked={lead.do_not_contact} compact /></td>
               </tr>
             ))}
 
             {filteredLeads.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                <td colSpan={7} className="p-8 text-center text-muted-foreground">
                   Aucun lead ne correspond à votre recherche.
                 </td>
               </tr>

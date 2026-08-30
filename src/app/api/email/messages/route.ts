@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { gmailFetch, header, extractBody, encodeMessage, getOwnEmailAccount } from '@/lib/email/gmail'
 import { getActionContext } from '@/lib/auth/action-context'
 
+const emailAddress = (value: string) => (value.match(/<([^>]+)>/)?.[1] || value).trim().toLowerCase()
+
 export async function GET(request: NextRequest) {
   const access = await getActionContext('messaging')
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: 403 })
@@ -23,6 +25,32 @@ export async function GET(request: NextRequest) {
       const headers = item.payload?.headers ?? []
       return { id, threadId: item.threadId, from: header(headers, 'From'), to: header(headers, 'To'), subject: header(headers, 'Subject') || '(sans objet)', date: header(headers, 'Date'), snippet: item.snippet ?? '', unread: (item.labelIds ?? []).includes('UNREAD'), labels:item.labelIds ?? [] }
     }))
+    if (folder === 'inbox' && messages.length) {
+      const { supabase, user } = await getOwnEmailAccount()
+      if (user) {
+        const incomingEmails = [...new Set(messages.map((message:any) => emailAddress(message.from)).filter((value:string) => /^\S+@\S+\.\S+$/.test(value)))]
+        const [{ data: clients }, { data: leads }] = await Promise.all([
+          supabase.from('clients').select('id, contact_email').not('contact_email', 'is', null).limit(1000),
+          supabase.from('website_leads').select('id, email').is('deleted_at', null).limit(1000),
+        ])
+        const clientByEmail = new Map((clients ?? []).map(client => [String(client.contact_email).trim().toLowerCase(), client.id]))
+        const leadByEmail = new Map((leads ?? []).map(lead => [String(lead.email).trim().toLowerCase(), lead.id]))
+        const knownEmails = incomingEmails.filter(email => clientByEmail.has(email) || leadByEmail.has(email))
+        if (knownEmails.length) await supabase.from('contact_engagements').upsert(knownEmails.map(email => ({ email_key: email })), { onConflict: 'email_key', ignoreDuplicates: true })
+        const inboundRows = messages.flatMap((message:any) => {
+          const email = emailAddress(message.from)
+          if (!clientByEmail.has(email) && !leadByEmail.has(email)) return []
+          const parsedDate = new Date(message.date)
+          return [{
+            email_key: email, user_id: user.id, direction: 'inbound', outcome: 'received',
+            occurred_at: Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString(),
+            subject: message.subject, gmail_message_id: message.id, gmail_thread_id: message.threadId,
+            client_id: clientByEmail.get(email) ?? null, website_lead_id: leadByEmail.get(email) ?? null,
+          }]
+        })
+        if (inboundRows.length) await supabase.from('contact_touchpoints').upsert(inboundRows, { onConflict: 'user_id,gmail_message_id,direction', ignoreDuplicates: true })
+      }
+    }
     return NextResponse.json({ messages, nextPageToken:list.nextPageToken ?? null, total:list.resultSizeEstimate ?? 0 })
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Erreur Gmail' }, { status: 502 }) }
 }
@@ -57,6 +85,15 @@ export async function POST(request: NextRequest) {
     if (subject.length > 300 || body.length > 100_000) return NextResponse.json({ error: 'Message trop long' }, { status: 400 })
     const { account, supabase, user } = await getOwnEmailAccount()
     if (!account || !user) return NextResponse.json({ error: 'Boîte Gmail non connectée' }, { status: 409 })
+    const normalizedRecipient = to.toLowerCase()
+    if (input.clientId) {
+      const { data: client } = await supabase.from('clients').select('do_not_contact').eq('id', input.clientId).maybeSingle()
+      if (client?.do_not_contact) return NextResponse.json({ error: 'Ce contact est marqué « Ne plus contacter »' }, { status: 409 })
+    }
+    if (input.leadId) {
+      const { data: lead } = await supabase.from('website_leads').select('do_not_contact').eq('id', input.leadId).maybeSingle()
+      if (lead?.do_not_contact) return NextResponse.json({ error: 'Ce lead est marqué « Ne plus contacter »' }, { status: 409 })
+    }
     const catalogueFiles = {
       africa_fr: '/catalogues/IM_Energie_Catalogue_Afrique_2027_FR_Email.pdf',
       africa_en: '/catalogues/IM_Energie_Catalogue_Afrique_2027_EN_Email.pdf',
@@ -95,8 +132,26 @@ export async function POST(request: NextRequest) {
     const raw = encodeMessage({ from: account.email_address, to, cc: cc || undefined, subject, body, inReplyTo: input.inReplyTo, references: input.references, importance, attachments })
     const sent = await (await gmailFetch('/messages/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raw, threadId: input.threadId || undefined }) })).json()
     await supabase.from('email_activity').insert({ user_id: user.id, gmail_message_id: sent.id, gmail_thread_id: sent.threadId, direction: 'outbound', recipient: to, subject, website_lead_id: input.leadId || null, client_id: input.clientId || null })
+    await supabase.from('contact_engagements').upsert({ email_key: normalizedRecipient }, { onConflict: 'email_key', ignoreDuplicates: true })
+    const { error: touchpointError } = await supabase.from('contact_touchpoints').insert({
+      email_key: normalizedRecipient, user_id: user.id, direction: 'outbound', outcome: 'completed',
+      occurred_at: new Date().toISOString(), subject, gmail_message_id: sent.id, gmail_thread_id: sent.threadId,
+      client_id: input.clientId || null, website_lead_id: input.leadId || null,
+    })
+    if (touchpointError) console.error('CONTACT TOUCHPOINT ERROR:', touchpointError.message)
     if (input.leadId) await supabase.from('email_crm_links').upsert({ user_id: user.id, gmail_thread_id: sent.threadId, website_lead_id: input.leadId }, { onConflict: 'user_id,gmail_thread_id' })
     if (input.clientId) await supabase.from('email_crm_links').upsert({ user_id: user.id, gmail_thread_id: sent.threadId, client_id: input.clientId }, { onConflict: 'user_id,gmail_thread_id' })
+    if (input.leadId) await supabase.from('website_leads').update({ status: 'contacted', assigned_to: user.id }).eq('id', input.leadId).eq('status', 'new')
+    const followUpDate = String(input.followUpDate ?? '')
+    if (/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
+      const { error: taskError } = await supabase.from('taches').insert({
+        title: `Relancer — ${to}`, description: `Relance après l’e-mail : ${subject}`,
+        status: 'a_faire', priority: importance === 'high' ? 'haute' : 'normale', due_date: followUpDate,
+        assigned_to: user.id, created_by: user.id, client_id: input.clientId || null,
+        website_lead_id: input.leadId || null, task_type: 'follow_up',
+      })
+      if (taskError) console.error('FOLLOW-UP TASK ERROR:', taskError.message)
+    }
     return NextResponse.json({ success: true, id: sent.id, threadId: sent.threadId })
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Envoi impossible' }, { status: 502 }) }
 }

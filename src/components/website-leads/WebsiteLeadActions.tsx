@@ -8,6 +8,8 @@ import {
   convertWebsiteLeadToOpportunityAction,
   updateWebsiteLeadNotesAction,
   updateWebsiteLeadStatusAction,
+  updateWebsiteLeadAssignmentAction,
+  updateWebsiteLeadContactPolicyAction,
 } from '@/lib/actions/website-leads'
 import { WEBSITE_LEAD_STATUS_OPTIONS } from './WebsiteLeadStatusBadge'
 
@@ -16,6 +18,10 @@ type Props = {
   status: string | null
   internalNotes?: string | null
   isConverted?: boolean
+  assignedTo?: string | null
+  doNotContact?: boolean
+  users?: { id: string; full_name: string }[]
+  canAssign?: boolean
 }
 
 export default function WebsiteLeadActions({
@@ -23,10 +29,16 @@ export default function WebsiteLeadActions({
   status,
   internalNotes,
   isConverted,
+  assignedTo,
+  doNotContact = false,
+  users = [],
+  canAssign = false,
 }: Props) {
   const router = useRouter()
   const [currentStatus, setCurrentStatus] = useState(status || 'new')
   const [notes, setNotes] = useState(internalNotes || '')
+  const [assignee, setAssignee] = useState(assignedTo || '')
+  const [blocked, setBlocked] = useState(doNotContact)
   const [isPending, startTransition] = useTransition()
 
   function handleStatusChange(nextStatus: string) {
@@ -59,6 +71,27 @@ export default function WebsiteLeadActions({
     })
   }
 
+  function handleAssignment(nextAssignee: string) {
+    setAssignee(nextAssignee)
+    startTransition(async () => {
+      const result = await updateWebsiteLeadAssignmentAction(leadId, nextAssignee || null)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('Responsable commercial mis à jour')
+      router.refresh()
+    })
+  }
+
+  function handleContactPolicy() {
+    const next = !blocked
+    setBlocked(next)
+    startTransition(async () => {
+      const result = await updateWebsiteLeadContactPolicyAction(leadId, next)
+      if (result.error) { setBlocked(!next); toast.error(result.error); return }
+      toast.success(next ? 'Les envois sont désormais bloqués' : 'Le contact peut de nouveau être sollicité')
+      router.refresh()
+    })
+  }
+
   function handleConvert() {
     startTransition(async () => {
       const result = await convertWebsiteLeadToOpportunityAction(leadId)
@@ -81,6 +114,7 @@ export default function WebsiteLeadActions({
       </div>
 
       <div className="mt-5 space-y-5">
+        {canAssign && <div><label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Responsable commercial</label><select value={assignee} onChange={(event) => handleAssignment(event.target.value)} disabled={isPending} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-800 outline-none focus:border-gold-400"><option value="">Non attribué</option>{users.map(user => <option key={user.id} value={user.id}>{user.full_name}</option>)}</select></div>}
         <div>
           <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             Statut du lead
@@ -122,6 +156,7 @@ export default function WebsiteLeadActions({
         </div>
 
         <div className="border-t border-slate-200 pt-5">
+          <button type="button" onClick={handleContactPolicy} disabled={isPending} className={`mb-3 inline-flex w-full items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold ${blocked ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{blocked ? 'Ne plus contacter — actif' : 'Marquer « Ne plus contacter »'}</button>
           <button
             type="button"
             onClick={handleConvert}

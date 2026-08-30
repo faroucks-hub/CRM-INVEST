@@ -60,6 +60,7 @@ type Attachment = { name: string; type: string; data?: string; size: number; cat
 type CommunicationLanguage = "fr" | "en" | "unknown";
 type CommunicationMarket = "africa" | "international" | "unknown";
 type Draft = { to: string; cc: string; subject: string; body: string; importance: "normal" | "high"; attachments: Attachment[] };
+type ContactSummary = { email_key: string; first_contacted_at: string | null; last_contacted_at: string | null; last_reply_at: string | null; outbound_count: number; inbound_count: number; history_checked_at: string | null; last_subject: string | null };
 type ComposeFont = "sans" | "century-gothic" | "serif" | "mono";
 type Preferences = { signature: string; signatureEnabled: boolean; replySignature: string; replySignatureEnabled: boolean; logoEnabled: boolean; suggestedSignature: string; font: ComposeFont };
 const folders: { key: Folder; label: string; icon: typeof Inbox }[] = [
@@ -181,6 +182,9 @@ export default function MailboxClient({
     }),
     [sending, setSending] = useState(false);
   const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [contactSummary, setContactSummary] = useState<ContactSummary | null>(null);
+  const [contactStatusLoading, setContactStatusLoading] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState("");
   const [templateLanguage, setTemplateLanguage] = useState<CommunicationLanguage>(initialLanguage === "fr" || initialLanguage === "en" ? initialLanguage : "unknown");
   const [templateMarket, setTemplateMarket] = useState<CommunicationMarket>(initialMarket === "africa" || initialMarket === "international" ? initialMarket : "unknown");
   const initialTemplateApplied = useRef(false);
@@ -220,6 +224,33 @@ export default function MailboxClient({
     initialTemplateApplied.current = true;
     void applyTemplate(initialMarket, initialLanguage);
   }, [applyTemplate, connected, initialLanguage, initialMarket, initialTo, preferencesLoaded]);
+
+  useEffect(() => {
+    const recipient = draft.to.trim().toLowerCase();
+    if (!connected || !compose || !/^\S+@\S+\.\S+$/.test(recipient)) {
+      setContactSummary(null);
+      return;
+    }
+    const timeout = window.setTimeout(async () => {
+      setContactStatusLoading(true);
+      try {
+        const params = new URLSearchParams({ email: recipient });
+        const matchesInitialContact = recipient === initialTo.trim().toLowerCase();
+        if (matchesInitialContact && initialClientId) params.set("clientId", initialClientId);
+        if (matchesInitialContact && initialLeadId) params.set("leadId", initialLeadId);
+        const response = await fetch(`/api/email/contact-status?${params}`);
+        const data = await responseJson(response);
+        if (!response.ok) throw new Error(data.error);
+        setContactSummary(data.summary ?? null);
+      } catch (error) {
+        setContactSummary(null);
+        toast.error(error instanceof Error ? error.message : "Historique du contact indisponible");
+      } finally {
+        setContactStatusLoading(false);
+      }
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [compose, connected, draft.to, initialClientId, initialLeadId, initialTo]);
 
   const newMessage = () => {
     setSelected(null);
@@ -330,6 +361,7 @@ export default function MailboxClient({
   };
   const sendMail = async () => {
     if (!draft.to.trim()) return toast.error("Destinataire requis");
+    const matchesInitialContact = draft.to.trim().toLowerCase() === initialTo.trim().toLowerCase();
     setSending(true);
     try {
       const r = await fetch("/api/email/messages", {
@@ -339,14 +371,16 @@ export default function MailboxClient({
           ...draft,
           threadId: selected?.threadId,
           replyToMessageId: selected?.messageId,
-          leadId: initialLeadId || undefined,
-          clientId: initialClientId || undefined,
+          leadId: matchesInitialContact ? initialLeadId || undefined : undefined,
+          clientId: matchesInitialContact ? initialClientId || undefined : undefined,
+          followUpDate: followUpDate || undefined,
         }),
       });
       const data = await responseJson(r);
       if (!r.ok) throw new Error(data.error);
       toast.success("Message envoyé");
       setCompose(false);
+      setFollowUpDate("");
       setDraft({ to: initialTo, cc: "", subject: "", body: "", importance: "normal", attachments: [] });
       if (folder === "sent") void load();
     } catch (e) {
@@ -629,6 +663,10 @@ export default function MailboxClient({
           onTemplateLanguageChange={setTemplateLanguage}
           onTemplateMarketChange={setTemplateMarket}
           onApplyTemplate={applyTemplate}
+          contactSummary={contactSummary}
+          contactStatusLoading={contactStatusLoading}
+          followUpDate={followUpDate}
+          onFollowUpDateChange={setFollowUpDate}
         />
       )}
       {settingsOpen && <SettingsPanel email={email || ""} value={preferences} onChange={setPreferences} onClose={() => setSettingsOpen(false)} />}
@@ -850,6 +888,10 @@ function Compose({
   onTemplateLanguageChange,
   onTemplateMarketChange,
   onApplyTemplate,
+  contactSummary,
+  contactStatusLoading,
+  followUpDate,
+  onFollowUpDateChange,
 }: {
   draft: Draft;
   setDraft: (v: Draft) => void;
@@ -863,6 +905,10 @@ function Compose({
   onTemplateLanguageChange: (value: CommunicationLanguage) => void;
   onTemplateMarketChange: (value: CommunicationMarket) => void;
   onApplyTemplate: (market: Exclude<CommunicationMarket, "unknown">, language: Exclude<CommunicationLanguage, "unknown">) => Promise<void>;
+  contactSummary: ContactSummary | null;
+  contactStatusLoading: boolean;
+  followUpDate: string;
+  onFollowUpDateChange: (value: string) => void;
 }) {
   const addAttachments = async (files: FileList | null) => {
     if (!files) return;
@@ -908,6 +954,27 @@ function Compose({
               placeholder="client@entreprise.com"
             />
           </label>
+          {draft.to.trim() && (
+            <div className={cn(
+              "mt-3 rounded-xl border px-3.5 py-3 text-xs",
+              contactStatusLoading ? "border-slate-200 bg-slate-50 text-slate-500" :
+              contactSummary && contactSummary.outbound_count > 0 ? "border-amber-200 bg-amber-50 text-amber-900" :
+              contactSummary?.history_checked_at ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-500"
+            )}>
+              {contactStatusLoading ? (
+                <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" />Vérification de l’historique Gmail…</span>
+              ) : contactSummary && contactSummary.outbound_count > 0 ? (
+                <div>
+                  <p className="font-bold">Déjà contacté · {contactSummary.outbound_count} message{contactSummary.outbound_count > 1 ? "s" : ""} envoyé{contactSummary.outbound_count > 1 ? "s" : ""}</p>
+                  <p className="mt-1 text-amber-700">Dernier contact : {contactSummary.last_contacted_at ? new Date(contactSummary.last_contacted_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" }) : "date indisponible"}{contactSummary.inbound_count > 0 ? ` · ${contactSummary.inbound_count} réponse${contactSummary.inbound_count > 1 ? "s" : ""}` : " · aucune réponse trouvée"}</p>
+                </div>
+              ) : contactSummary?.history_checked_at ? (
+                <p className="font-semibold">Jamais contacté depuis la boîte Gmail connectée</p>
+              ) : (
+                <p>Historique à vérifier avant l’envoi.</p>
+              )}
+            </div>
+          )}
           <label className="block border-b border-slate-200 py-2 text-xs font-semibold text-slate-400">
             Cc
             <input
@@ -947,6 +1014,17 @@ function Compose({
               <option value="normal">Normale</option>
               <option value="high">Haute</option>
             </select>
+          </div>
+          <div className="border-b border-slate-200 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-400">Prochaine relance</span>
+              <div className="flex gap-1.5">
+                {[3, 7].map((days) => <button key={days} type="button" onClick={() => { const date = new Date(); date.setDate(date.getDate() + days); onFollowUpDateChange(date.toISOString().slice(0, 10)); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-gold-400 hover:bg-gold-50">+{days} jours</button>)}
+                {followUpDate && <button type="button" onClick={() => onFollowUpDateChange("")} className="rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:text-red-600">Aucune</button>}
+              </div>
+            </div>
+            <input type="date" value={followUpDate} min={new Date().toISOString().slice(0, 10)} onChange={(event) => onFollowUpDateChange(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-gold-400" />
+            <p className="mt-1.5 text-[11px] text-slate-400">Après l’envoi réussi, la relance sera créée dans Tâches & Relances.</p>
           </div>
           <RichTextEditor value={draft.body} onChange={(body) => setDraft({ ...draft, body })} className={fontClass} style={fontStyle} />
           {draft.attachments.length > 0 && <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">{draft.attachments.map((file, index) => <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600"><Paperclip className="h-3.5 w-3.5"/><span className="max-w-48 truncate">{file.name}</span><button onClick={() => setDraft({ ...draft, attachments: draft.attachments.filter((_, i) => i !== index) })} className="text-slate-400 hover:text-red-600"><X className="h-3.5 w-3.5"/></button></span>)}</div>}

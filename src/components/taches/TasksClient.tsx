@@ -30,13 +30,14 @@ interface Props {
   tasks:       Record<string,unknown>[]
   users:       {id:string;full_name:string}[]
   clients:     {id:string;company_name:string}[]
+  leads:       {id:string;full_name:string|null;company:string|null}[]
   projects:    {id:string;reference:string;name:string}[]
   role:        string
   isAdminOrLead:boolean
   currentUserId:string
 }
 
-export default function TasksClient({ tasks, users, clients, projects, role, isAdminOrLead, currentUserId }: Props) {
+export default function TasksClient({ tasks, users, clients, leads, projects, role, isAdminOrLead, currentUserId }: Props) {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
   const [editTask,  setEditTask]  = useState<Record<string,unknown>|null>(null)
@@ -118,9 +119,10 @@ export default function TasksClient({ tasks, users, clients, projects, role, isA
       const c = row.clients as Record<string,unknown>|null
       const p = row.projets_v2 as Record<string,unknown>|null
       const q = row.quotations_v2 as Record<string,unknown>|null
+      const l = row.website_leads as Record<string,unknown>|null
       return (
         <div className="text-xs text-gray-500">
-          {c?.company_name as string ?? p?.reference as string ?? q?.number as string ?? '—'}
+          {c?.company_name as string ?? l?.company as string ?? l?.full_name as string ?? p?.reference as string ?? q?.number as string ?? '—'}
         </div>
       )
     }},
@@ -216,7 +218,7 @@ export default function TasksClient({ tasks, users, clients, projects, role, isA
       </div>
 
       <TaskModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditTask(null)}}
-        task={editTask} users={users} clients={clients} projects={projects}
+        task={editTask} users={users} clients={clients} leads={leads} projects={projects}
         currentUserId={currentUserId}/>
 
       <ConfirmDialog open={!!deleteTarget} onClose={()=>setDelete(null)} onConfirm={handleDelete}
@@ -227,10 +229,11 @@ export default function TasksClient({ tasks, users, clients, projects, role, isA
 }
 
 // ── Task Modal ────────────────────────────────────────────────────
-function TaskModal({ open, onClose, task, users, clients, projects, currentUserId }: {
+function TaskModal({ open, onClose, task, users, clients, leads, projects, currentUserId }: {
   open:boolean; onClose:()=>void; task?:Record<string,unknown>|null;
   users:{id:string;full_name:string}[];
   clients:{id:string;company_name:string}[];
+  leads:{id:string;full_name:string|null;company:string|null}[];
   projects:{id:string;reference:string;name:string}[];
   currentUserId:string;
 }) {
@@ -246,6 +249,7 @@ function TaskModal({ open, onClose, task, users, clients, projects, currentUserI
     due_date:    String(task?.due_date??''),
     assigned_to: String(task?.assigned_to??currentUserId),
     client_id:   String(task?.client_id??''),
+    website_lead_id: String(task?.website_lead_id??''),
     project_id:  String(task?.project_id??''),
     notes:       String(task?.notes??''),
   })
@@ -259,7 +263,7 @@ function TaskModal({ open, onClose, task, users, clients, projects, currentUserI
       title:f.title, description:f.description||undefined,
       status:f.status as TaskPayload['status'], priority:f.priority as TaskPayload['priority'],
       due_date:f.due_date||undefined, assigned_to:f.assigned_to||undefined,
-      client_id:f.client_id||undefined, project_id:f.project_id||undefined, notes:f.notes||undefined,
+      client_id:f.client_id||undefined, website_lead_id:f.website_lead_id||undefined, project_id:f.project_id||undefined, notes:f.notes||undefined,
     }
     const r = isEdit
       ? await updateTaskAction(String(task!.id), payload)
@@ -297,10 +301,17 @@ function TaskModal({ open, onClose, task, users, clients, projects, currentUserI
         </FormGrid>
         <FormGrid cols={2}>
           <div><label className="label">Client lié</label>
-            <select className="input" value={f.client_id} onChange={up('client_id')}>
+            <select className="input" value={f.client_id} onChange={(event) => setF(current => ({ ...current, client_id: event.target.value, website_lead_id: event.target.value ? '' : current.website_lead_id }))}>
               <option value="">— Aucun —</option>
               {clients.map(c=><option key={c.id} value={c.id}>{c.company_name}</option>)}
             </select></div>
+          <div><label className="label">Lead lié</label>
+            <select className="input" value={f.website_lead_id} onChange={(event) => setF(current => ({ ...current, website_lead_id: event.target.value, client_id: event.target.value ? '' : current.client_id }))}>
+              <option value="">— Aucun —</option>
+              {leads.map(lead=><option key={lead.id} value={lead.id}>{lead.company || lead.full_name || 'Lead'}</option>)}
+            </select></div>
+        </FormGrid>
+        <FormGrid cols={2}>
           <div><label className="label">Projet lié</label>
             <select className="input" value={f.project_id} onChange={up('project_id')}>
               <option value="">— Aucun —</option>

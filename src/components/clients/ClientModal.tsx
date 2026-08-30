@@ -24,6 +24,7 @@ const schema = z.object({
   contact_whatsapp: z.string().optional(),
   communication_language: z.enum(['fr', 'en', 'unknown']),
   communication_market: z.enum(['africa', 'international', 'unknown']),
+  do_not_contact:    z.boolean(),
   contact2_name:    z.string().optional(),
   contact2_email:   z.string().optional(),
   contact2_phone:   z.string().optional(),
@@ -114,6 +115,7 @@ export default function ClientModal({ open, onClose, client, users, isAdminOrLea
         contact_whatsapp: String(client.contact_whatsapp ?? ''),
         communication_language: String(client.communication_language ?? 'unknown') as 'fr' | 'en' | 'unknown',
         communication_market: String(client.communication_market ?? 'unknown') as 'africa' | 'international' | 'unknown',
+        do_not_contact:    Boolean(client.do_not_contact),
         contact2_name:    String(client.contact2_name ?? ''),
         contact2_email:   String(client.contact2_email ?? ''),
         contact2_phone:   String(client.contact2_phone ?? ''),
@@ -127,6 +129,7 @@ export default function ClientModal({ open, onClose, client, users, isAdminOrLea
         currency_pref: 'USD',
         communication_language: 'unknown',
         communication_market: 'unknown',
+        do_not_contact: false,
       },
     })
 
@@ -209,6 +212,10 @@ export default function ClientModal({ open, onClose, client, users, isAdminOrLea
             <Select label="Orientation commerciale"
               {...register('communication_market')} options={MARKET_OPTIONS} />
           </FormGrid>
+          <label className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50/60 p-3 text-sm text-red-800">
+            <input type="checkbox" {...register('do_not_contact')} className="mt-0.5 h-4 w-4 rounded border-red-300" />
+            <span><strong>Ne plus contacter</strong><span className="mt-0.5 block text-xs font-normal text-red-600">Bloque les futurs envois depuis la messagerie CRM.</span></span>
+          </label>
         </FormSection>
 
         {/* Contact secondaire */}

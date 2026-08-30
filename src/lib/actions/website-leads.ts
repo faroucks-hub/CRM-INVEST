@@ -79,6 +79,27 @@ export async function updateWebsiteLeadNotesAction(
   return { success: true }
 }
 
+export async function updateWebsiteLeadAssignmentAction(leadId: string, assignedTo: string | null) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
+  if (access.role === 'commercial' && assignedTo !== access.user.id) return { error: 'Attribution réservée au Team Leader ou à l’administrateur' }
+  const { error } = await access.supabase.from('website_leads').update({ assigned_to: assignedTo }).eq('id', leadId)
+  if (error) return { error: error.message }
+  revalidatePath('/website-leads')
+  revalidatePath(`/website-leads/${leadId}`)
+  return { success: true }
+}
+
+export async function updateWebsiteLeadContactPolicyAction(leadId: string, doNotContact: boolean) {
+  const access = await getActionContext('website_leads')
+  if (!access.ok) return { error: access.error }
+  const { error } = await access.supabase.from('website_leads').update({ do_not_contact: doNotContact }).eq('id', leadId)
+  if (error) return { error: error.message }
+  revalidatePath('/website-leads')
+  revalidatePath(`/website-leads/${leadId}`)
+  return { success: true }
+}
+
 export async function convertWebsiteLeadToOpportunityAction(leadId: string) {
   const access = await getActionContext('website_leads')
   if (!access.ok) return { error: access.error }

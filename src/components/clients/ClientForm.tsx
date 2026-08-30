@@ -32,7 +32,10 @@ export default function ClientForm({ client, users = [], role, currentUserId, mo
     if (!formRef.current) return
     setError(null)
     const rawFormData = new FormData(formRef.current)
-    const formData = Object.fromEntries(rawFormData.entries()) as ClientFormData
+    const formData = {
+      ...Object.fromEntries(rawFormData.entries()),
+      do_not_contact: rawFormData.get('do_not_contact') === 'on',
+    } as ClientFormData
 
     startTransition(async () => {
       try {
@@ -150,6 +153,10 @@ export default function ClientForm({ client, users = [], role, currentUserId, mo
               <option value="international">International</option>
             </select>
           </FormField>
+          <label className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50/60 p-3 text-sm text-red-800">
+            <input name="do_not_contact" type="checkbox" defaultChecked={Boolean(client?.do_not_contact)} className="mt-0.5 h-4 w-4 rounded border-red-300" />
+            <span><strong>Ne plus contacter</strong><span className="mt-0.5 block text-xs font-normal text-red-600">Bloque les envois depuis la messagerie CRM.</span></span>
+          </label>
         </div>
       </section>
 
