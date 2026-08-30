@@ -55,8 +55,10 @@ type Detail = Summary & {
   html: string;
   text: string;
 };
-type Attachment = { name: string; type: string; data?: string; size: number; catalogueKey?: "fr" | "en" };
+type CatalogueKey = "africa_fr" | "africa_en" | "international_fr" | "international_en";
+type Attachment = { name: string; type: string; data?: string; size: number; catalogueKey?: CatalogueKey };
 type CommunicationLanguage = "fr" | "en" | "unknown";
+type CommunicationMarket = "africa" | "international" | "unknown";
 type Draft = { to: string; cc: string; subject: string; body: string; importance: "normal" | "high"; attachments: Attachment[] };
 type ComposeFont = "sans" | "century-gothic" | "serif" | "mono";
 type Preferences = { signature: string; signatureEnabled: boolean; replySignature: string; replySignatureEnabled: boolean; logoEnabled: boolean; suggestedSignature: string; font: ComposeFont };
@@ -102,13 +104,23 @@ const signatureHtml = (value: string, enabled: boolean, logoEnabled: boolean) =>
   const logo = logoEnabled ? '<td style="padding-right:14px;vertical-align:top"><img src="https://crm.im-energie.com/images/logo-ime-signature.png" alt="IM Énergie" width="92" style="display:block;width:92px;height:auto;border:0"></td>' : "";
   return `<br><br><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;color:#10233f"><tr>${logo}<td style="vertical-align:top;border-left:2px solid #e2a719;padding-left:14px;font-size:13px;line-height:1.45">${textToHtml(value.trim())}</td></tr></table>`;
 };
-const catalogueByLanguage = {
-  fr: { url: "/catalogues/IM_Energie_Catalogue_International_2027_FR_Email.pdf", name: "IM_Energie_Catalogue_International_2027_FR.pdf" },
-  en: { url: "/catalogues/IM_Energie_General_Catalogue_2027_EN_Email.pdf", name: "IM_Energie_General_Catalogue_2027_EN.pdf" },
+const catalogues: Record<CatalogueKey, { name: string; size: number }> = {
+  africa_fr: { name: "IM_Energie_Catalogue_Afrique_2027_FR.pdf", size: 6_139_014 },
+  africa_en: { name: "IM_Energie_Catalogue_Afrique_2027_EN.pdf", size: 5_099_872 },
+  international_fr: { name: "IM_Energie_Catalogue_International_2027_FR.pdf", size: 5_240_900 },
+  international_en: { name: "IM_Energie_General_Catalogue_2027_EN.pdf", size: 5_154_448 },
 } as const;
-const templateContent = (language: Exclude<CommunicationLanguage, "unknown">, contactName: string, company: string) => {
+const templateContent = (market: Exclude<CommunicationMarket, "unknown">, language: Exclude<CommunicationLanguage, "unknown">, contactName: string, company: string) => {
   const person = contactName.trim();
   const organisation = company.trim();
+  if (market === "africa" && language === "fr") return {
+    subject: `Présentation d’IM Énergie — Solutions pour vos projets${organisation ? ` — ${organisation}` : ""}`,
+    body: `<p>${person ? `Bonjour ${escapeHtml(person)},` : "Madame, Monsieur,"}</p><p>Je vous contacte au nom d’IM Énergie, société basée à Istanbul qui accompagne des projets énergétiques industriels, notamment sur les marchés africains, en coordination avec des fabricants qualifiés.</p><p>Notre approche tient compte des exigences techniques, des conditions d’exploitation, de la logistique internationale et du suivi de fabrication jusqu’à la livraison.</p><p>Nous intervenons notamment sur les systèmes UPS industriels, redresseurs et chargeurs, onduleurs, convertisseurs de fréquence, stabilisateurs, solutions solaires et systèmes de stockage d’énergie.</p><p>Vous trouverez en pièce jointe notre documentation 2027 destinée aux marchés africains. Nous restons disponibles pour étudier vos besoins et définir une approche adaptée à votre projet.</p><p>Cordialement,</p>`,
+  };
+  if (market === "africa" && language === "en") return {
+    subject: `Introducing IM Energy — Solutions for your projects${organisation ? ` — ${organisation}` : ""}`,
+    body: `<p>${person ? `Dear ${escapeHtml(person)},` : "Dear Sir or Madam,"}</p><p>I am contacting you on behalf of IM Energy, an Istanbul-based company supporting industrial energy projects, particularly across African markets, in coordination with qualified manufacturers.</p><p>Our approach considers technical requirements, operating conditions, international logistics, and manufacturing follow-up through delivery.</p><p>Our scope includes industrial UPS systems, rectifiers and battery chargers, inverters, frequency converters, voltage stabilizers, solar solutions, and energy storage systems.</p><p>Please find attached our 2027 documentation for African markets. We would be pleased to review your requirements and discuss an approach suited to your project.</p><p>Kind regards,</p>`,
+  };
   if (language === "fr") return {
     subject: `Présentation d’IM Énergie${organisation ? ` — ${organisation}` : ""}`,
     body: `<p>${person ? `Bonjour ${escapeHtml(person)},` : "Madame, Monsieur,"}</p><p>Je vous contacte au nom d’IM Énergie, société spécialisée dans l’accompagnement de projets énergétiques industriels et la mise en relation avec des fabricants qualifiés.</p><p>Nous intervenons notamment sur les systèmes UPS industriels, redresseurs et chargeurs, onduleurs, convertisseurs de fréquence, stabilisateurs, solutions solaires et systèmes de stockage d’énergie.</p><p>Vous trouverez en pièce jointe notre catalogue général international 2027. Nous restons disponibles pour étudier vos besoins techniques et vous proposer une approche adaptée à votre projet.</p><p>Cordialement,</p>`,
@@ -132,6 +144,7 @@ export default function MailboxClient({
   initialContactName = "",
   initialCompany = "",
   initialLanguage = "unknown",
+  initialMarket = "unknown",
 }: {
   connected: boolean;
   email?: string;
@@ -141,6 +154,7 @@ export default function MailboxClient({
   initialContactName?: string;
   initialCompany?: string;
   initialLanguage?: string;
+  initialMarket?: string;
 }) {
   const [folder, setFolder] = useState<Folder>("inbox"),
     [messages, setMessages] = useState<Summary[]>([]),
@@ -167,6 +181,8 @@ export default function MailboxClient({
     }),
     [sending, setSending] = useState(false);
   const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [templateLanguage, setTemplateLanguage] = useState<CommunicationLanguage>(initialLanguage === "fr" || initialLanguage === "en" ? initialLanguage : "unknown");
+  const [templateMarket, setTemplateMarket] = useState<CommunicationMarket>(initialMarket === "africa" || initialMarket === "international" ? initialMarket : "unknown");
   const initialTemplateApplied = useRef(false);
   const currentFolder = folders.find((item) => item.key === folder)!;
 
@@ -175,22 +191,22 @@ export default function MailboxClient({
     void fetch("/api/email/preferences").then(responseJson).then((data) => setPreferences({ signature: data.signature || "", signatureEnabled: data.signatureEnabled !== false, replySignature: data.replySignature || "", replySignatureEnabled: data.replySignatureEnabled !== false, logoEnabled: data.logoEnabled !== false, suggestedSignature: data.suggestedSignature || "", font: data.font || "sans" })).catch(() => undefined).finally(() => setPreferencesLoaded(true));
   }, [connected]);
 
-  const attachCatalogue = useCallback(async (language: Exclude<CommunicationLanguage, "unknown">) => {
-    const catalogue = catalogueByLanguage[language];
-    const size = language === "fr" ? 5_240_900 : 5_154_448;
-    return { name: catalogue.name, type: "application/pdf", size, catalogueKey: language } satisfies Attachment;
+  const attachCatalogue = useCallback(async (market: Exclude<CommunicationMarket, "unknown">, language: Exclude<CommunicationLanguage, "unknown">) => {
+    const catalogueKey = `${market}_${language}` as CatalogueKey;
+    const catalogue = catalogues[catalogueKey];
+    return { name: catalogue.name, type: "application/pdf", size: catalogue.size, catalogueKey } satisfies Attachment;
   }, []);
 
-  const applyTemplate = useCallback(async (language: Exclude<CommunicationLanguage, "unknown">) => {
+  const applyTemplate = useCallback(async (market: Exclude<CommunicationMarket, "unknown">, language: Exclude<CommunicationLanguage, "unknown">) => {
     setCatalogueLoading(true);
     try {
-      const content = templateContent(language, initialContactName, initialCompany);
-      const attachment = await attachCatalogue(language);
-      const manualAttachments = draft.attachments.filter((file) => !Object.values(catalogueByLanguage).some((catalogue) => catalogue.name === file.name));
+      const content = templateContent(market, language, initialContactName, initialCompany);
+      const attachment = await attachCatalogue(market, language);
+      const manualAttachments = draft.attachments.filter((file) => !file.catalogueKey);
       const total = manualAttachments.reduce((sum, file) => sum + file.size, attachment.size);
       if (total > 10 * 1024 * 1024) throw new Error("Le catalogue et les autres pièces jointes dépassent 10 Mo");
       setDraft((current) => ({ ...current, subject: content.subject, body: `${content.body}${signatureHtml(preferences.signature, preferences.signatureEnabled, preferences.logoEnabled)}`, attachments: [...manualAttachments, attachment] }));
-      toast.success(language === "fr" ? "Modèle français et catalogue ajoutés" : "English template and catalogue added");
+      toast.success(`${market === "africa" ? "Afrique" : "International"} — ${language === "fr" ? "Français" : "English"} ajouté`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Catalogue indisponible");
     } finally {
@@ -200,10 +216,10 @@ export default function MailboxClient({
 
   useEffect(() => {
     if (!connected || !preferencesLoaded || !initialTo || initialTemplateApplied.current) return;
-    if (initialLanguage !== "fr" && initialLanguage !== "en") return;
+    if ((initialLanguage !== "fr" && initialLanguage !== "en") || (initialMarket !== "africa" && initialMarket !== "international")) return;
     initialTemplateApplied.current = true;
-    void applyTemplate(initialLanguage);
-  }, [applyTemplate, connected, initialLanguage, initialTo, preferencesLoaded]);
+    void applyTemplate(initialMarket, initialLanguage);
+  }, [applyTemplate, connected, initialLanguage, initialMarket, initialTo, preferencesLoaded]);
 
   const newMessage = () => {
     setSelected(null);
@@ -608,6 +624,10 @@ export default function MailboxClient({
           onSend={sendMail}
           preferences={preferences}
           catalogueLoading={catalogueLoading}
+          templateLanguage={templateLanguage}
+          templateMarket={templateMarket}
+          onTemplateLanguageChange={setTemplateLanguage}
+          onTemplateMarketChange={setTemplateMarket}
           onApplyTemplate={applyTemplate}
         />
       )}
@@ -825,6 +845,10 @@ function Compose({
   onSend,
   preferences,
   catalogueLoading,
+  templateLanguage,
+  templateMarket,
+  onTemplateLanguageChange,
+  onTemplateMarketChange,
   onApplyTemplate,
 }: {
   draft: Draft;
@@ -834,7 +858,11 @@ function Compose({
   onSend: () => void;
   preferences: Preferences;
   catalogueLoading: boolean;
-  onApplyTemplate: (language: Exclude<CommunicationLanguage, "unknown">) => Promise<void>;
+  templateLanguage: CommunicationLanguage;
+  templateMarket: CommunicationMarket;
+  onTemplateLanguageChange: (value: CommunicationLanguage) => void;
+  onTemplateMarketChange: (value: CommunicationMarket) => void;
+  onApplyTemplate: (market: Exclude<CommunicationMarket, "unknown">, language: Exclude<CommunicationLanguage, "unknown">) => Promise<void>;
 }) {
   const addAttachments = async (files: FileList | null) => {
     if (!files) return;
@@ -895,11 +923,21 @@ function Compose({
             placeholder="Objet"
           />
           <div className="border-b border-slate-200 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="mr-1 text-xs font-semibold text-slate-400">Présentation commerciale</span>
-              <button type="button" disabled={catalogueLoading} onClick={() => void onApplyTemplate("fr")} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-gold-400 hover:bg-gold-50 disabled:opacity-50">FR + catalogue</button>
-              <button type="button" disabled={catalogueLoading} onClick={() => void onApplyTemplate("en")} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-gold-400 hover:bg-gold-50 disabled:opacity-50">EN + catalogue</button>
-              {catalogueLoading && <Loader2 className="h-4 w-4 animate-spin text-gold-500" />}
+            <span className="text-xs font-semibold text-slate-400">Présentation commerciale</span>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <select value={templateMarket} onChange={(event) => onTemplateMarketChange(event.target.value as CommunicationMarket)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-gold-400">
+                <option value="unknown">Marché à déterminer</option>
+                <option value="africa">Afrique</option>
+                <option value="international">International</option>
+              </select>
+              <select value={templateLanguage} onChange={(event) => onTemplateLanguageChange(event.target.value as CommunicationLanguage)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-gold-400">
+                <option value="unknown">Langue à déterminer</option>
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+              </select>
+              <button type="button" disabled={catalogueLoading || templateMarket === "unknown" || templateLanguage === "unknown"} onClick={() => { if (templateMarket !== "unknown" && templateLanguage !== "unknown") void onApplyTemplate(templateMarket, templateLanguage); }} className="inline-flex items-center justify-center gap-2 rounded-lg border border-gold-400 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 hover:bg-gold-100 disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400">
+                {catalogueLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Appliquer
+              </button>
             </div>
             <p className="mt-2 text-[11px] leading-4 text-slate-400">Le modèle remplace l’objet et le corps actuels. Vérifiez toujours le message et la pièce jointe avant l’envoi.</p>
           </div>

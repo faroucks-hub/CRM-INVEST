@@ -7,5 +7,5 @@ export default async function MessagingPage({ searchParams }: { searchParams: Pr
   if (!access.ok) redirect('/dashboard')
   const { data: account } = await access.supabase.from('email_accounts').select('email_address,status').eq('user_id', access.user.id).maybeSingle()
   const params = await searchParams
-  return <MailboxClient connected={account?.status==='active'} email={account?.email_address} initialTo={params.to} initialLeadId={params.leadId} initialClientId={params.clientId} initialContactName={params.contactName} initialCompany={params.company} initialLanguage={params.language}/>
+  return <MailboxClient connected={account?.status==='active'} email={account?.email_address} initialTo={params.to} initialLeadId={params.leadId} initialClientId={params.clientId} initialContactName={params.contactName} initialCompany={params.company} initialLanguage={params.language} initialMarket={params.market}/>
 }

@@ -21,6 +21,7 @@ const clientSchema = z.object({
   contact_phone:    z.string().optional(),
   contact_whatsapp: z.string().optional(),
   communication_language: z.enum(['fr', 'en', 'unknown']).default('unknown'),
+  communication_market: z.enum(['africa', 'international', 'unknown']).default('unknown'),
   contact2_name:    z.string().optional(),
   contact2_email:   z.string().optional(),
   contact2_phone:   z.string().optional(),

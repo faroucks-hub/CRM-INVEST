@@ -23,6 +23,7 @@ const schema = z.object({
   contact_phone:    z.string().optional(),
   contact_whatsapp: z.string().optional(),
   communication_language: z.enum(['fr', 'en', 'unknown']),
+  communication_market: z.enum(['africa', 'international', 'unknown']),
   contact2_name:    z.string().optional(),
   contact2_email:   z.string().optional(),
   contact2_phone:   z.string().optional(),
@@ -78,6 +79,12 @@ const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English' },
 ]
 
+const MARKET_OPTIONS = [
+  { value: 'unknown', label: 'À déterminer au moment de l’envoi' },
+  { value: 'africa', label: 'Afrique' },
+  { value: 'international', label: 'International' },
+]
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -106,6 +113,7 @@ export default function ClientModal({ open, onClose, client, users, isAdminOrLea
         contact_phone:    String(client.contact_phone ?? ''),
         contact_whatsapp: String(client.contact_whatsapp ?? ''),
         communication_language: String(client.communication_language ?? 'unknown') as 'fr' | 'en' | 'unknown',
+        communication_market: String(client.communication_market ?? 'unknown') as 'africa' | 'international' | 'unknown',
         contact2_name:    String(client.contact2_name ?? ''),
         contact2_email:   String(client.contact2_email ?? ''),
         contact2_phone:   String(client.contact2_phone ?? ''),
@@ -118,6 +126,7 @@ export default function ClientModal({ open, onClose, client, users, isAdminOrLea
         status: 'prospect',
         currency_pref: 'USD',
         communication_language: 'unknown',
+        communication_market: 'unknown',
       },
     })
 
@@ -194,8 +203,12 @@ export default function ClientModal({ open, onClose, client, users, isAdminOrLea
             <Input label="Téléphone" {...register('contact_phone')} placeholder="+225 07..." />
             <Input label="WhatsApp" {...register('contact_whatsapp')} placeholder="+225 07..." />
           </FormGrid>
-          <Select label="Langue de communication"
-            {...register('communication_language')} options={LANGUAGE_OPTIONS} />
+          <FormGrid cols={2}>
+            <Select label="Langue de communication"
+              {...register('communication_language')} options={LANGUAGE_OPTIONS} />
+            <Select label="Orientation commerciale"
+              {...register('communication_market')} options={MARKET_OPTIONS} />
+          </FormGrid>
         </FormSection>
 
         {/* Contact secondaire */}

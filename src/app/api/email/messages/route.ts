@@ -58,8 +58,10 @@ export async function POST(request: NextRequest) {
     const { account, supabase, user } = await getOwnEmailAccount()
     if (!account || !user) return NextResponse.json({ error: 'Boîte Gmail non connectée' }, { status: 409 })
     const catalogueFiles = {
-      fr: '/catalogues/IM_Energie_Catalogue_International_2027_FR_Email.pdf',
-      en: '/catalogues/IM_Energie_General_Catalogue_2027_EN_Email.pdf',
+      africa_fr: '/catalogues/IM_Energie_Catalogue_Afrique_2027_FR_Email.pdf',
+      africa_en: '/catalogues/IM_Energie_Catalogue_Afrique_2027_EN_Email.pdf',
+      international_fr: '/catalogues/IM_Energie_Catalogue_International_2027_FR_Email.pdf',
+      international_en: '/catalogues/IM_Energie_General_Catalogue_2027_EN_Email.pdf',
     } as const
     const requestedAttachments = Array.isArray(input.attachments) ? input.attachments.slice(0, 5) : []
     const manualBytes = requestedAttachments.filter((file:any) => !file.catalogueKey).reduce((sum:number, file:any) => {
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
     if (manualBytes > 3 * 1024 * 1024) return NextResponse.json({ error: 'Les fichiers ajoutés manuellement dépassent la limite de 3 Mo' }, { status: 400 })
     const attachments = await Promise.all(requestedAttachments.map(async (file:any) => {
       if (!file.catalogueKey) return { name: String(file.name ?? 'piece-jointe').slice(0, 180), type: String(file.type ?? 'application/octet-stream').slice(0, 120), data: String(file.data ?? '') }
-      if (file.catalogueKey !== 'fr' && file.catalogueKey !== 'en') throw new Error('Catalogue non autorisé')
+      if (!Object.prototype.hasOwnProperty.call(catalogueFiles, file.catalogueKey)) throw new Error('Catalogue non autorisé')
       const catalogueKey = file.catalogueKey as keyof typeof catalogueFiles
       const catalogueResponse = await fetch(new URL(catalogueFiles[catalogueKey], request.url), {
         cache: 'force-cache',

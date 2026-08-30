@@ -142,6 +142,14 @@ export default function ClientForm({ client, users = [], role, currentUserId, mo
               <option value="en">English</option>
             </select>
           </FormField>
+          <FormField label="Orientation commerciale">
+            <select name="communication_market" className="input"
+              defaultValue={client?.communication_market ?? 'unknown'}>
+              <option value="unknown">À déterminer au moment de l’envoi</option>
+              <option value="africa">Afrique</option>
+              <option value="international">International</option>
+            </select>
+          </FormField>
         </div>
       </section>
 

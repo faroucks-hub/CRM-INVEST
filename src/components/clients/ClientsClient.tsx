@@ -113,7 +113,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
           )}
           <div className="flex items-center gap-2 mt-0.5">
             {Boolean(row.contact_email) && (
-              <Link href={`/messagerie?${new URLSearchParams({ to: String(row.contact_email), clientId: String(row.id), contactName: String(row.contact_name ?? ''), company: String(row.company_name ?? ''), language: String(row.communication_language ?? 'unknown') })}`}
+              <Link href={`/messagerie?${new URLSearchParams({ to: String(row.contact_email), clientId: String(row.id), contactName: String(row.contact_name ?? ''), company: String(row.company_name ?? ''), language: String(row.communication_language ?? 'unknown'), market: String(row.communication_market ?? 'unknown') })}`}
                 onClick={e => e.stopPropagation()}
                 className="text-gray-400 hover:text-navy-900 transition-colors">
                 <Mail className="w-3 h-3" />

@@ -82,6 +82,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 { l: 'Secteur',   v: client.sector ? SECTOR_LABELS[client.sector as keyof typeof SECTOR_LABELS] : null },
                 { l: 'Source',    v: client.lead_source ? LEAD_SOURCE_LABELS[client.lead_source as keyof typeof LEAD_SOURCE_LABELS] : null },
                 { l: 'Devise',    v: client.currency_pref },
+                { l: 'Langue de communication', v: client.communication_language === 'fr' ? 'Français' : client.communication_language === 'en' ? 'English' : 'À déterminer' },
+                { l: 'Orientation documentaire', v: client.communication_market === 'africa' ? 'Afrique' : client.communication_market === 'international' ? 'International' : 'À déterminer' },
                 { l: 'Commercial', v: (client as any).assigned_user?.full_name },
                 { l: 'Conditions', v: client.payment_terms },
               ].map(({ l, v }) => v ? (
@@ -156,7 +158,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 </div>
                 <div className="space-y-2">
                   {client.contact_email && (
-                    <Link href={`/messagerie?${new URLSearchParams({ to: client.contact_email, clientId: client.id, contactName: client.contact_name ?? '', company: client.company_name, language: client.communication_language ?? 'unknown' })}`}
+                    <Link href={`/messagerie?${new URLSearchParams({ to: client.contact_email, clientId: client.id, contactName: client.contact_name ?? '', company: client.company_name, language: client.communication_language ?? 'unknown', market: client.communication_market ?? 'unknown' })}`}
                       className="flex items-center gap-2 text-sm text-blue-600
                                  hover:text-blue-800 transition-colors">
                       <Mail className="w-4 h-4 flex-shrink-0" />

@@ -82,6 +82,7 @@ export interface Client {
   contact_phone?: string | null
   contact_whatsapp?: string | null
   communication_language?: 'fr' | 'en' | 'unknown' | null
+  communication_market?: 'africa' | 'international' | 'unknown' | null
   whatsapp?: string | null
   contact2_name?: string | null
   contact2_email?: string | null
