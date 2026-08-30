@@ -55,7 +55,7 @@ type Detail = Summary & {
   html: string;
   text: string;
 };
-type Attachment = { name: string; type: string; data: string; size: number };
+type Attachment = { name: string; type: string; data?: string; size: number; catalogueKey?: "fr" | "en" };
 type CommunicationLanguage = "fr" | "en" | "unknown";
 type Draft = { to: string; cc: string; subject: string; body: string; importance: "normal" | "high"; attachments: Attachment[] };
 type ComposeFont = "sans" | "century-gothic" | "serif" | "mono";
@@ -177,16 +177,8 @@ export default function MailboxClient({
 
   const attachCatalogue = useCallback(async (language: Exclude<CommunicationLanguage, "unknown">) => {
     const catalogue = catalogueByLanguage[language];
-    const response = await fetch(catalogue.url);
-    if (!response.ok) throw new Error("Catalogue indisponible");
-    const blob = await response.blob();
-    const data = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("Lecture du catalogue impossible"));
-      reader.readAsDataURL(blob);
-    });
-    return { name: catalogue.name, type: "application/pdf", data, size: blob.size } satisfies Attachment;
+    const size = language === "fr" ? 5_240_900 : 5_154_448;
+    return { name: catalogue.name, type: "application/pdf", size, catalogueKey: language } satisfies Attachment;
   }, []);
 
   const applyTemplate = useCallback(async (language: Exclude<CommunicationLanguage, "unknown">) => {
@@ -847,8 +839,11 @@ function Compose({
   const addAttachments = async (files: FileList | null) => {
     if (!files) return;
     const selectedFiles = Array.from(files).slice(0, 5 - draft.attachments.length);
+    const manualExisting = draft.attachments.filter((file) => !file.catalogueKey).reduce((sum, file) => sum + file.size, 0);
+    const manualTotal = selectedFiles.reduce((sum, file) => sum + file.size, manualExisting);
     const total = selectedFiles.reduce((sum, file) => sum + file.size, draft.attachments.reduce((sum, file) => sum + file.size, 0));
-    if (total > 10 * 1024 * 1024) return toast.error("Les pièces jointes ne doivent pas dépasser 10 Mo");
+    if (manualTotal > 3 * 1024 * 1024) return toast.error("Les fichiers ajoutés manuellement sont limités à 3 Mo par envoi");
+    if (total > 10 * 1024 * 1024) return toast.error("Le catalogue et les autres pièces jointes dépassent 10 Mo");
     const encoded = await Promise.all(selectedFiles.map((file) => new Promise<Attachment>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve({ name: file.name, type: file.type || "application/octet-stream", data: String(reader.result), size: file.size });

@@ -57,7 +57,31 @@ export async function POST(request: NextRequest) {
     if (subject.length > 300 || body.length > 100_000) return NextResponse.json({ error: 'Message trop long' }, { status: 400 })
     const { account, supabase, user } = await getOwnEmailAccount()
     if (!account || !user) return NextResponse.json({ error: 'Boîte Gmail non connectée' }, { status: 409 })
-    const attachments = Array.isArray(input.attachments) ? input.attachments.slice(0, 5) : []
+    const catalogueFiles = {
+      fr: '/catalogues/IM_Energie_Catalogue_International_2027_FR_Email.pdf',
+      en: '/catalogues/IM_Energie_General_Catalogue_2027_EN_Email.pdf',
+    } as const
+    const requestedAttachments = Array.isArray(input.attachments) ? input.attachments.slice(0, 5) : []
+    const manualBytes = requestedAttachments.filter((file:any) => !file.catalogueKey).reduce((sum:number, file:any) => {
+      const encoded = String(file.data ?? '').replace(/^data:[^,]+,/, '').replace(/\s/g, '')
+      const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0
+      return sum + Math.max(0, Math.floor(encoded.length * 3 / 4) - padding)
+    }, 0)
+    if (manualBytes > 3 * 1024 * 1024) return NextResponse.json({ error: 'Les fichiers ajoutés manuellement dépassent la limite de 3 Mo' }, { status: 400 })
+    const attachments = await Promise.all(requestedAttachments.map(async (file:any) => {
+      if (!file.catalogueKey) return { name: String(file.name ?? 'piece-jointe').slice(0, 180), type: String(file.type ?? 'application/octet-stream').slice(0, 120), data: String(file.data ?? '') }
+      if (file.catalogueKey !== 'fr' && file.catalogueKey !== 'en') throw new Error('Catalogue non autorisé')
+      const catalogueKey = file.catalogueKey as keyof typeof catalogueFiles
+      const catalogueResponse = await fetch(new URL(catalogueFiles[catalogueKey], request.url), {
+        cache: 'force-cache',
+        redirect: 'manual',
+        headers: { cookie: request.headers.get('cookie') ?? '' },
+      })
+      if (!catalogueResponse.ok) throw new Error(`Catalogue ${catalogueKey.toUpperCase()} indisponible`)
+      const catalogue = Buffer.from(await catalogueResponse.arrayBuffer())
+      if (catalogue.subarray(0, 5).toString('ascii') !== '%PDF-') throw new Error(`Le fichier ${catalogueKey.toUpperCase()} reçu n'est pas un PDF valide`)
+      return { name: catalogueFiles[catalogueKey].split('/').at(-1)!, type: 'application/pdf', data: catalogue.toString('base64') }
+    }))
     const totalBytes = attachments.reduce((sum:number, file:any) => {
       const encoded = String(file.data ?? '').replace(/^data:[^,]+,/, '').replace(/\s/g, '')
       const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0
