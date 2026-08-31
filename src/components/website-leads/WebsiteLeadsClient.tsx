@@ -1,10 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { Search, Mail, Phone } from 'lucide-react'
+import { Search, Mail, Phone, Eye } from 'lucide-react'
 import { WebsiteLeadStatusBadge, WEBSITE_LEAD_STATUS_OPTIONS } from './WebsiteLeadStatusBadge'
 import ContactEngagementBadge, { type ContactEngagement } from '@/components/commercial/ContactEngagementBadge'
+import CommercialContactDrawer, { type CommercialContactRecord } from '@/components/commercial/CommercialContactDrawer'
 
 type WebsiteLead = {
   id: string
@@ -18,6 +18,9 @@ type WebsiteLead = {
   source: string | null
   status: string | null
   do_not_contact: boolean
+  internal_notes?: string | null
+  assigned_user?: { full_name?: string | null } | null
+  next_task?: CommercialContactRecord['nextTask']
   contact_engagement?: ContactEngagement | null
 }
 
@@ -29,6 +32,19 @@ export default function WebsiteLeadsClient({
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [contactStatus, setContactStatus] = useState('')
+  const [selectedLead, setSelectedLead] = useState<WebsiteLead | null>(null)
+
+  function drawerRecord(lead: WebsiteLead): CommercialContactRecord {
+    const statusLabel = WEBSITE_LEAD_STATUS_OPTIONS.find(option => option.value === (lead.status || 'new'))?.label ?? (lead.status || 'Nouveau')
+    const mailHref = lead.email ? `/messagerie?${new URLSearchParams({ to: lead.email, leadId: lead.id, contactName: lead.full_name ?? '', company: lead.company ?? '' })}` : null
+    return {
+      id: lead.id, kind: 'lead', name: lead.full_name || lead.company || 'Lead sans nom', company: lead.company,
+      contactName: lead.full_name, email: lead.email, phone: lead.phone, country: lead.country,
+      statusLabel, source: lead.source || 'Site web', owner: lead.assigned_user?.full_name || null,
+      summary: lead.internal_notes || lead.message, engagement: lead.contact_engagement,
+      blocked: lead.do_not_contact, nextTask: lead.next_task, mailHref, detailHref: `/website-leads/${lead.id}`,
+    }
+  }
 
   const filteredLeads = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -108,28 +124,27 @@ export default function WebsiteLeadsClient({
               <th className="p-3">Source</th>
               <th className="p-3">Statut</th>
               <th className="p-3">Suivi e-mail</th>
+              <th className="p-3">Prochaine action</th>
+              <th className="p-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
 
           <tbody>
             {filteredLeads.map((lead) => (
-              <tr key={lead.id} className="border-t hover:bg-muted/50">
+              <tr key={lead.id} onClick={() => setSelectedLead(lead)} className="cursor-pointer border-t hover:bg-muted/50">
                 <td className="p-3 whitespace-nowrap text-gray-500">
                   {new Date(lead.created_at).toLocaleDateString()}
                 </td>
 
                 <td className="p-3">
-                  <Link
-                    href={`/website-leads/${lead.id}`}
-                    className="block rounded-md outline-none focus:ring-2 focus:ring-gold-400/40"
-                  >
+                  <button type="button" onClick={() => setSelectedLead(lead)} className="block rounded-md text-left outline-none focus:ring-2 focus:ring-gold-400/40">
                     <span className="font-medium text-blue-600 hover:underline">
                       {lead.full_name || 'Sans nom'}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500">
                       {lead.company || 'Entreprise non renseignée'}
                     </span>
-                  </Link>
+                  </button>
                 </td>
 
                 <td className="p-3">
@@ -151,12 +166,14 @@ export default function WebsiteLeadsClient({
                   <WebsiteLeadStatusBadge status={lead.status} />
                 </td>
                 <td className="p-3"><ContactEngagementBadge engagement={lead.contact_engagement} blocked={lead.do_not_contact} compact /></td>
+                <td className="p-3">{lead.next_task ? <div className="max-w-[180px]"><div className="truncate text-xs font-medium text-slate-700">{lead.next_task.title}</div><div className="mt-0.5 text-[11px] text-amber-700">{lead.next_task.due_date ? new Date(lead.next_task.due_date).toLocaleDateString('fr-FR') : 'Sans échéance'}</div></div> : <span className="text-xs font-medium text-red-500">À planifier</span>}</td>
+                <td className="p-3" onClick={event => event.stopPropagation()}><button type="button" onClick={() => setSelectedLead(lead)} className="btn-icon p-1.5" title="Consulter le suivi"><Eye className="h-3.5 w-3.5" /></button></td>
               </tr>
             ))}
 
             {filteredLeads.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                <td colSpan={9} className="p-8 text-center text-muted-foreground">
                   Aucun lead ne correspond à votre recherche.
                 </td>
               </tr>
@@ -164,6 +181,7 @@ export default function WebsiteLeadsClient({
           </tbody>
         </table>
       </div>
+      <CommercialContactDrawer record={selectedLead ? drawerRecord(selectedLead) : null} onClose={() => setSelectedLead(null)} />
     </div>
   )
 }

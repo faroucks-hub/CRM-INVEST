@@ -16,8 +16,9 @@ export default async function ClientsPage() {
   let query = supabase
     .from('clients')
     .select(`id, reference, company_name, trade_name, status, country, city, sector,
-      contact_name, contact_email, contact_phone, contact_whatsapp, communication_language, communication_market,
-      assigned_to, lead_source, currency_pref, notes, tags, do_not_contact, is_archived, created_at, updated_at`)
+      contact_name, contact_title, contact_email, contact_phone, contact_whatsapp, communication_language, communication_market,
+      assigned_to, lead_source, currency_pref, notes, tags, do_not_contact, is_archived, created_at, updated_at,
+      assigned_user:users_profiles!clients_assigned_to_fkey(id, full_name)`)
     .eq('is_archived', false)
     .order('created_at', { ascending: false })
 
@@ -29,9 +30,21 @@ export default async function ClientsPage() {
     ? await supabase.from('contact_engagements').select('*').in('email_key', emails)
     : { data: [] }
   const engagementByEmail = new Map((engagements ?? []).map(item => [item.email_key, item]))
+  const clientIds = (clients ?? []).map(client => client.id)
+  const { data: followUps } = clientIds.length
+    ? await supabase.from('taches')
+        .select('id, client_id, title, due_date, priority, assigned_to, users_profiles!taches_assigned_to_fkey(full_name)')
+        .in('client_id', clientIds).neq('status', 'termine').order('due_date', { ascending: true, nullsFirst: false })
+    : { data: [] }
+  const nextTaskByClient = new Map<string, Record<string, unknown>>()
+  for (const task of followUps ?? []) if (task.client_id && !nextTaskByClient.has(task.client_id)) {
+    const assignee = task.users_profiles as unknown as { full_name?: string } | null
+    nextTaskByClient.set(task.client_id, { ...task, assigned_name: assignee?.full_name ?? null })
+  }
   const clientsWithEngagement = (clients ?? []).map(client => ({
     ...client,
     contact_engagement: client.contact_email ? engagementByEmail.get(client.contact_email.trim().toLowerCase()) ?? null : null,
+    next_task: nextTaskByClient.get(client.id) ?? null,
   }))
 
   const { data: users } = isAdminOrLead

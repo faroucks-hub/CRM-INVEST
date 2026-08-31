@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Plus, Download, Upload, Filter, X, Phone, Mail, MessageCircle } from 'lucide-react'
+import { Plus, Download, Upload, Filter, X, Phone, Mail, MessageCircle, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import DataTable, { type Column } from '@/components/ui/table/DataTable'
 import { StatusBadge, Avatar } from '@/components/ui/StatusBadge'
@@ -13,6 +13,7 @@ import { exportToCSV, parseCSV } from '@/lib/utils/export'
 import { formatDate } from '@/lib/utils'
 import { CLIENT_STATUS_EXTENDED, LEAD_SOURCE_LABELS } from '@/types/sprint2'
 import ContactEngagementBadge, { type ContactEngagement } from '@/components/commercial/ContactEngagementBadge'
+import CommercialContactDrawer, { type CommercialContactRecord } from '@/components/commercial/CommercialContactDrawer'
 
 interface Props {
   clients: Record<string, unknown>[]
@@ -38,6 +39,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
   const [modalOpen, setModalOpen]     = useState(false)
   const [editClient, setEditClient]   = useState<Record<string, unknown> | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Record<string, unknown> | null>(null)
+  const [viewClient, setViewClient] = useState<Record<string, unknown> | null>(null)
   const [deleting, setDeleting]       = useState(false)
 
   // Filtres
@@ -161,6 +163,14 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
         : <span className="text-gray-300">—</span>,
     },
     {
+      key: 'next_task',
+      header: 'Prochaine action',
+      render: row => {
+        const task = row.next_task as { title?: string; due_date?: string | null } | null
+        return task ? <div className="max-w-[180px]"><div className="truncate text-xs font-medium text-slate-700">{task.title}</div><div className="mt-0.5 text-[11px] text-amber-700">{task.due_date ? formatDate(task.due_date) : 'Sans échéance'}</div></div> : <span className="text-xs font-medium text-red-500">À planifier</span>
+      },
+    },
+    {
       key: 'created_at',
       header: 'Créé le',
       sortable: true,
@@ -217,6 +227,24 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
   }
 
   const clearFilters = () => { setFilterStatus(''); setFilterSector(''); setFilterAssigned(''); setFilterContact('') }
+
+  function drawerRecord(row: Record<string, unknown>): CommercialContactRecord {
+    const assigned = row.assigned_user as { full_name?: string } | null
+    const task = row.next_task as CommercialContactRecord['nextTask']
+    const email = String(row.contact_email ?? '')
+    const status = CLIENT_STATUS_EXTENDED[String(row.status) as keyof typeof CLIENT_STATUS_EXTENDED]
+    return {
+      id: String(row.id), kind: 'client', name: String(row.company_name ?? 'Client'),
+      company: String(row.company_name ?? ''), contactName: String(row.contact_name ?? ''),
+      contactTitle: String(row.contact_title ?? ''), email, phone: String(row.contact_phone ?? ''),
+      country: String(row.country ?? ''), city: String(row.city ?? ''), statusLabel: status?.label ?? String(row.status ?? '—'),
+      source: row.lead_source ? (LEAD_SOURCE_LABELS[String(row.lead_source) as keyof typeof LEAD_SOURCE_LABELS] ?? String(row.lead_source)) : null,
+      owner: assigned?.full_name ?? null, summary: String(row.notes ?? ''),
+      engagement: row.contact_engagement as ContactEngagement | null, blocked: Boolean(row.do_not_contact), nextTask: task,
+      detailHref: `/clients/${row.id}`,
+      mailHref: email ? `/messagerie?${new URLSearchParams({ to: email, clientId: String(row.id), contactName: String(row.contact_name ?? ''), company: String(row.company_name ?? ''), language: String(row.communication_language ?? 'unknown'), market: String(row.communication_market ?? 'unknown') })}` : null,
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-4">
@@ -323,9 +351,12 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
           pageSize={25}
           emptyMessage="Aucun client"
           emptySubtext="Créez votre premier client avec le bouton ci-dessus"
-          onRowClick={row => { setEditClient(row); setModalOpen(true) }}
+          onRowClick={row => setViewClient(row)}
           actions={row => (
             <div className="flex items-center gap-1">
+              <button onClick={() => setViewClient(row)} className="btn-icon p-1.5" title="Consulter le suivi">
+                <Eye className="w-3.5 h-3.5" />
+              </button>
               <button
                 onClick={() => { setEditClient(row); setModalOpen(true) }}
                 className="btn-icon p-1.5"
@@ -359,6 +390,12 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
         client={editClient}
         users={users}
         isAdminOrLead={isAdminOrLead}
+      />
+
+      <CommercialContactDrawer
+        record={viewClient ? drawerRecord(viewClient) : null}
+        onClose={() => setViewClient(null)}
+        onEdit={viewClient ? () => { setEditClient(viewClient); setViewClient(null); setModalOpen(true) } : undefined}
       />
 
       <ConfirmDialog

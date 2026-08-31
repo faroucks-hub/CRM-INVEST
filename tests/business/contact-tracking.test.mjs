@@ -19,5 +19,7 @@ test('les états commerciaux reposent sur les échanges vérifiés', () => {
   assert.equal(getCommercialContactState({ ...checked, outbound_count: 0, inbound_count: 2 }), 'awaiting_reply')
   assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 0 }), 'contacted')
   assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 1 }), 'reply_received')
+  assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 1, last_contacted_at: '2026-08-29T10:00:00Z', last_reply_at: '2026-08-30T10:00:00Z' }), 'awaiting_reply')
+  assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 1, last_contacted_at: '2026-08-30T11:00:00Z', last_reply_at: '2026-08-30T10:00:00Z' }), 'reply_received')
   assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 1 }, true), 'blocked')
 })
