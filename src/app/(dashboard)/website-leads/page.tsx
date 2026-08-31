@@ -12,7 +12,7 @@ export default async function WebsiteLeadsPage() {
 
   const { data: leads, error } = await supabase
     .from('website_leads')
-    .select('*, assigned_user:users_profiles!website_leads_assigned_to_fkey(id, full_name)')
+    .select('*')
     .order('created_at', { ascending: false })
   const emails = [...new Set((leads ?? []).map(lead => lead.email?.trim().toLowerCase()).filter(Boolean))] as string[]
   const { data: engagements } = emails.length
@@ -30,8 +30,14 @@ export default async function WebsiteLeadsPage() {
     const assignee = task.users_profiles as unknown as { full_name?: string } | null
     nextTaskByLead.set(task.website_lead_id, { ...task, assigned_name: assignee?.full_name ?? null })
   }
+  const assignedIds = [...new Set((leads ?? []).map(lead => lead.assigned_to).filter(Boolean))] as string[]
+  const { data: assignees } = assignedIds.length
+    ? await supabase.from('users_profiles').select('id, full_name').in('id', assignedIds)
+    : { data: [] }
+  const assigneeById = new Map((assignees ?? []).map(item => [item.id, item]))
   const leadsWithEngagement = (leads ?? []).map(lead => ({
     ...lead,
+    assigned_user: lead.assigned_to ? assigneeById.get(lead.assigned_to) ?? null : null,
     contact_engagement: lead.email ? engagementByEmail.get(lead.email.trim().toLowerCase()) ?? null : null,
     next_task: nextTaskByLead.get(lead.id) ?? null,
   }))
