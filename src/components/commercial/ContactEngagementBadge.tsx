@@ -15,14 +15,15 @@ export type ContactEngagement = {
 
 export default function ContactEngagementBadge({ engagement, blocked = false, compact = false }: { engagement?: ContactEngagement | null; blocked?: boolean; compact?: boolean }) {
   const state = getCommercialContactState(engagement, blocked)
-  if (state === 'blocked') return <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700"><AlertTriangle className="h-3.5 w-3.5" />Ne plus contacter</span>
+  if (state === 'blocked') return <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700"><AlertTriangle className="h-3.5 w-3.5" />{compact ? 'Ne pas contacter' : 'Ne plus contacter'}</span>
   if (state === 'unverified') return <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500"><Clock3 className="h-3.5 w-3.5" />À vérifier</span>
   const outbound = Number(engagement?.outbound_count ?? 0)
   const inbound = Number(engagement?.inbound_count ?? 0)
+  if (compact && outbound > 0) return <span className="inline-flex whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">Contacté · {outbound}</span>
   if (state === 'awaiting_reply') return <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700"><MessageCircleReply className="h-3.5 w-3.5" />À répondre · {inbound}</span>
-  if (state === 'never_contacted') return <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700"><Clock3 className="h-3.5 w-3.5" />Jamais contacté</span>
+  if (state === 'never_contacted') return <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700"><Clock3 className="h-3.5 w-3.5" />{compact ? 'Non contacté' : 'Jamais contacté'}</span>
   const date = engagement?.last_contacted_at ? new Date(engagement.last_contacted_at) : null
-  const label = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: compact ? undefined : 'numeric' }) : 'date inconnue'
+  const label = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : 'date inconnue'
   return <span title={engagement?.last_subject || undefined} className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold', inbound ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800')}>
     {inbound ? <MessageCircleReply className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
     {inbound ? 'Réponse reçue' : 'Contacté'} · {outbound} · {label}

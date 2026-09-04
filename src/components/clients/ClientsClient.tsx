@@ -73,11 +73,13 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       key: 'company_name',
       header: 'Société',
       sortable: true,
+      className: 'sticky left-0 z-10 min-w-[280px] max-w-[280px] bg-white',
+      headerClassName: 'sticky left-0 z-20 min-w-[280px] bg-gray-50',
       render: row => (
         <div className="flex items-center gap-2.5">
           <Avatar name={String(row.company_name ?? '')} />
-          <div>
-            <div className="text-sm font-medium text-navy-900">
+          <div className="min-w-0">
+            <div className="truncate whitespace-nowrap text-sm font-medium text-navy-900" title={String(row.company_name ?? '')}>
               {String(row.company_name)}
             </div>
             {Boolean(row.reference) && (
@@ -90,6 +92,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
     {
       key: 'status',
       header: 'Statut',
+      className: 'min-w-[125px] whitespace-nowrap',
       render: row => {
         const s = CLIENT_STATUS_EXTENDED[String(row.status) as keyof typeof CLIENT_STATUS_EXTENDED]
         return s ? <StatusBadge label={s.label} color={s.color} /> : null
@@ -99,6 +102,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       key: 'country',
       header: 'Pays / Ville',
       sortable: true,
+      className: 'min-w-[190px]',
       render: row => (
         <div>
           <div className="text-sm text-gray-900">{String(row.country ?? '')}</div>
@@ -107,33 +111,30 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       ),
     },
     {
-      key: 'sector',
-      header: 'Secteur',
-      render: row => row.sector
-        ? <span className="text-xs text-gray-600">{SECTOR_LABELS[String(row.sector)] ?? String(row.sector)}</span>
-        : <span className="text-gray-300">—</span>,
-    },
-    {
       key: 'contact_name',
       header: 'Contact',
+      className: 'min-w-[260px]',
       render: row => (
-        <div>
+        <div className="space-y-1">
           {Boolean(row.contact_name) && (
             <div className="text-sm text-gray-900">{String(row.contact_name)}</div>
           )}
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2">
             {Boolean(row.contact_email) && (
               <Link href={`/messagerie?${new URLSearchParams({ to: String(row.contact_email), clientId: String(row.id), contactName: String(row.contact_name ?? ''), company: String(row.company_name ?? ''), language: String(row.communication_language ?? 'unknown'), market: String(row.communication_market ?? 'unknown') })}`}
                 onClick={e => e.stopPropagation()}
-                className="text-gray-400 hover:text-navy-900 transition-colors">
-                <Mail className="w-3 h-3" />
+                title={String(row.contact_email)}
+                className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500 hover:text-navy-900 transition-colors">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="max-w-[210px] truncate whitespace-nowrap">{String(row.contact_email)}</span>
               </Link>
             )}
             {Boolean(row.contact_phone) && (
               <a href={`tel:${row.contact_phone}`}
                 onClick={e => e.stopPropagation()}
+                title={String(row.contact_phone)}
                 className="text-gray-400 hover:text-navy-900 transition-colors">
-                <Phone className="w-3 h-3" />
+                <Phone className="w-3.5 h-3.5" />
               </a>
             )}
             {Boolean(row.contact_whatsapp) && (
@@ -150,12 +151,14 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
     },
     {
       key: 'contact_engagement',
-      header: 'Suivi e-mail',
+      header: 'Suivi',
+      className: 'min-w-[145px] whitespace-nowrap',
       render: row => <ContactEngagementBadge engagement={row.contact_engagement as ContactEngagement | null} blocked={Boolean(row.do_not_contact)} compact />,
     },
     {
       key: 'lead_source',
       header: 'Source',
+      className: 'min-w-[170px]',
       render: row => row.lead_source
         ? <span className="text-xs text-gray-500">
             {LEAD_SOURCE_LABELS[String(row.lead_source) as keyof typeof LEAD_SOURCE_LABELS] ?? String(row.lead_source)}
@@ -165,6 +168,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
     {
       key: 'next_task',
       header: 'Prochaine action',
+      className: 'min-w-[260px]',
       render: row => {
         const task = row.next_task as { title?: string; due_date?: string | null } | null
         return task ? <div className="max-w-[180px]"><div className="truncate text-xs font-medium text-slate-700">{task.title}</div><div className="mt-0.5 text-[11px] text-amber-700">{task.due_date ? formatDate(task.due_date) : 'Sans échéance'}</div></div> : <span className="text-xs font-medium text-red-500">À planifier</span>
@@ -174,6 +178,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       key: 'created_at',
       header: 'Créé le',
       sortable: true,
+      className: 'min-w-[120px] whitespace-nowrap',
       render: row => <span className="text-xs text-gray-400">{formatDate(String(row.created_at))}</span>,
     },
   ]
@@ -241,6 +246,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       source: row.lead_source ? (LEAD_SOURCE_LABELS[String(row.lead_source) as keyof typeof LEAD_SOURCE_LABELS] ?? String(row.lead_source)) : null,
       owner: assigned?.full_name ?? null, summary: String(row.notes ?? ''),
       engagement: row.contact_engagement as ContactEngagement | null, blocked: Boolean(row.do_not_contact), nextTask: task,
+      touchpoints: (row.contact_touchpoints ?? []) as CommercialContactRecord['touchpoints'],
       detailHref: `/clients/${row.id}`,
       mailHref: email ? `/messagerie?${new URLSearchParams({ to: email, clientId: String(row.id), contactName: String(row.contact_name ?? ''), company: String(row.company_name ?? ''), language: String(row.communication_language ?? 'unknown'), market: String(row.communication_market ?? 'unknown') })}` : null,
     }
@@ -349,6 +355,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
           searchPlaceholder="Rechercher par société, pays, contact..."
           searchKeys={['company_name', 'country', 'city', 'contact_name', 'contact_email']}
           pageSize={25}
+          tableClassName="min-w-[1680px]"
           emptyMessage="Aucun client"
           emptySubtext="Créez votre premier client avec le bouton ci-dessus"
           onRowClick={row => setViewClient(row)}

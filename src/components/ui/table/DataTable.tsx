@@ -26,6 +26,7 @@ interface DataTableProps<T extends Record<string, unknown>> {
   onRowClick?: (row: T) => void
   actions?: (row: T) => React.ReactNode
   headerActions?: React.ReactNode
+  tableClassName?: string
 }
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -41,6 +42,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   onRowClick,
   actions,
   headerActions,
+  tableClassName,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -117,7 +119,7 @@ export default function DataTable<T extends Record<string, unknown>>({
 
       {/* Table */}
       <div className="table-wrapper">
-        <table className="table">
+        <table className={cn('table', tableClassName)}>
           <thead>
             <tr>
               {columns.map(col => (

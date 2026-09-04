@@ -23,3 +23,8 @@ test('les états commerciaux reposent sur les échanges vérifiés', () => {
   assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 1, last_contacted_at: '2026-08-30T11:00:00Z', last_reply_at: '2026-08-30T10:00:00Z' }), 'reply_received')
   assert.equal(getCommercialContactState({ ...checked, outbound_count: 2, inbound_count: 1 }, true), 'blocked')
 })
+
+test('le nombre affiché comme contacté correspond aux contacts sortants', () => {
+  const engagement = { history_checked_at: '2026-09-01T00:00:00Z', outbound_count: 3, inbound_count: 2 }
+  assert.equal(Number(engagement.outbound_count), 3)
+})

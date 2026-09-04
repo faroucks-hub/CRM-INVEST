@@ -31,6 +31,23 @@ export default async function ClientsPage() {
     : { data: [] }
   const engagementByEmail = new Map((engagements ?? []).map(item => [item.email_key, item]))
   const clientIds = (clients ?? []).map(client => client.id)
+  const { data: touchpoints } = clientIds.length
+    ? await supabase.from('contact_touchpoints')
+        .select('id, client_id, user_id, direction, channel, outcome, occurred_at, subject')
+        .in('client_id', clientIds).order('occurred_at', { ascending: false })
+    : { data: [] }
+  const touchpointUserIds = [...new Set((touchpoints ?? []).map(item => item.user_id).filter(Boolean))]
+  const { data: touchpointUsers } = touchpointUserIds.length
+    ? await supabase.from('users_profiles').select('id, full_name').in('id', touchpointUserIds)
+    : { data: [] }
+  const touchpointUserById = new Map((touchpointUsers ?? []).map(item => [item.id, item.full_name]))
+  const touchpointsByClient = new Map<string, Record<string, unknown>[]>()
+  for (const touchpoint of touchpoints ?? []) {
+    if (!touchpoint.client_id) continue
+    const list = touchpointsByClient.get(touchpoint.client_id) ?? []
+    list.push({ ...touchpoint, user_name: touchpointUserById.get(touchpoint.user_id) ?? null })
+    touchpointsByClient.set(touchpoint.client_id, list)
+  }
   const { data: followUps } = clientIds.length
     ? await supabase.from('taches')
         .select('id, client_id, title, due_date, priority, assigned_to, users_profiles!taches_assigned_to_fkey(full_name)')
@@ -44,6 +61,7 @@ export default async function ClientsPage() {
   const clientsWithEngagement = (clients ?? []).map(client => ({
     ...client,
     contact_engagement: client.contact_email ? engagementByEmail.get(client.contact_email.trim().toLowerCase()) ?? null : null,
+    contact_touchpoints: touchpointsByClient.get(client.id) ?? [],
     next_task: nextTaskByClient.get(client.id) ?? null,
   }))
 
