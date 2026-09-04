@@ -20,6 +20,7 @@ export type CommercialContactRecord = {
   city?: string | null
   statusLabel: string
   source?: string | null
+  createdAt?: string | null
   owner?: string | null
   summary?: string | null
   engagement?: ContactEngagement | null
@@ -100,6 +101,7 @@ export default function CommercialContactDrawer({
               <Info label="Localisation" value={location} />
               <Info label="Responsable" value={record.owner} />
               <Info label="Source" value={record.source} />
+              <Info label="Fiche créée le" value={dateLabel(record.createdAt)} />
             </dl>
             <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
               {record.email && <div className="flex items-center gap-2 text-sm text-slate-700"><Mail className="h-4 w-4 text-slate-400" /><span className="break-all">{record.email}</span></div>}

@@ -155,32 +155,6 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       className: 'min-w-[145px] whitespace-nowrap',
       render: row => <ContactEngagementBadge engagement={row.contact_engagement as ContactEngagement | null} blocked={Boolean(row.do_not_contact)} compact />,
     },
-    {
-      key: 'lead_source',
-      header: 'Source',
-      className: 'min-w-[170px]',
-      render: row => row.lead_source
-        ? <span className="text-xs text-gray-500">
-            {LEAD_SOURCE_LABELS[String(row.lead_source) as keyof typeof LEAD_SOURCE_LABELS] ?? String(row.lead_source)}
-          </span>
-        : <span className="text-gray-300">—</span>,
-    },
-    {
-      key: 'next_task',
-      header: 'Prochaine action',
-      className: 'min-w-[260px]',
-      render: row => {
-        const task = row.next_task as { title?: string; due_date?: string | null } | null
-        return task ? <div className="max-w-[180px]"><div className="truncate text-xs font-medium text-slate-700">{task.title}</div><div className="mt-0.5 text-[11px] text-amber-700">{task.due_date ? formatDate(task.due_date) : 'Sans échéance'}</div></div> : <span className="text-xs font-medium text-red-500">À planifier</span>
-      },
-    },
-    {
-      key: 'created_at',
-      header: 'Créé le',
-      sortable: true,
-      className: 'min-w-[120px] whitespace-nowrap',
-      render: row => <span className="text-xs text-gray-400">{formatDate(String(row.created_at))}</span>,
-    },
   ]
 
   // Export CSV
@@ -244,6 +218,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
       contactTitle: String(row.contact_title ?? ''), email, phone: String(row.contact_phone ?? ''),
       country: String(row.country ?? ''), city: String(row.city ?? ''), statusLabel: status?.label ?? String(row.status ?? '—'),
       source: row.lead_source ? (LEAD_SOURCE_LABELS[String(row.lead_source) as keyof typeof LEAD_SOURCE_LABELS] ?? String(row.lead_source)) : null,
+      createdAt: String(row.created_at ?? ''),
       owner: assigned?.full_name ?? null, summary: String(row.notes ?? ''),
       engagement: row.contact_engagement as ContactEngagement | null, blocked: Boolean(row.do_not_contact), nextTask: task,
       touchpoints: (row.contact_touchpoints ?? []) as CommercialContactRecord['touchpoints'],
@@ -355,7 +330,7 @@ export default function ClientsClient({ clients, users, role, isAdminOrLead, cur
           searchPlaceholder="Rechercher par société, pays, contact..."
           searchKeys={['company_name', 'country', 'city', 'contact_name', 'contact_email']}
           pageSize={25}
-          tableClassName="min-w-[1680px]"
+          tableClassName="min-w-[1100px]"
           emptyMessage="Aucun client"
           emptySubtext="Créez votre premier client avec le bouton ci-dessus"
           onRowClick={row => setViewClient(row)}

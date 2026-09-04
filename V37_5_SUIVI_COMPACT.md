@@ -1,6 +1,8 @@
 # V37.5 — Liste commerciale lisible et suivi détaillé
 
 - La liste Clients & Prospects n'affiche plus la colonne Secteur.
+- Les colonnes Source, Prochaine action et Créé le sont retirées de la liste.
+- Ces informations restent disponibles dans la fiche de suivi commercial.
 - Le statut de suivi est limité à `Contacté · n` dans le tableau.
 - `n` correspond au nombre de contacts sortants enregistrés.
 - Le tableau conserve des largeurs de colonnes stables et un défilement horizontal.
